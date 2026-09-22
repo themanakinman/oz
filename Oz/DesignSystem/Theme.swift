@@ -315,8 +315,6 @@ enum Theme {
         @MainActor static let searchFieldNSFont = NSFont.systemFont(
             ofSize: searchFieldSize, weight: .regular)
         static let headerIcon = Font.system(size: 18, weight: .medium)
-        /// The animated reasoning label uses the same Thermochrome face as website AI chat.
-        static let thinkingPhrase = Font.custom("MDThermochrome0.5Trial-Light", size: 15, relativeTo: .body)
         static let rowTitle = Font.body
         static let rowTrailing = Font.callout
         static let sectionHeader = Font.subheadline.weight(.medium)

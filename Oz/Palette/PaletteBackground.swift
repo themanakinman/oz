@@ -50,10 +50,7 @@ private struct PaletteSurface<S: Shape>: ViewModifier {
 
     func body(content: Content) -> some View {
         content.background {
-            ZStack {
-                shape.fill(.regularMaterial)
-                shape.fill(Theme.Colors.panelScrim(transparency: settings.paletteTransparency))
-            }
+            shape.fill(Theme.Colors.panelScrim(transparency: settings.paletteTransparency))
             .overlay {
                 shape.stroke(
                     Theme.Colors.panelEdgeHighlight(transparency: settings.paletteTransparency),

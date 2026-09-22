@@ -152,8 +152,11 @@ private struct AIEmptyState: View {
                 if canConfigure { Button("Configure AI", action: onConfigure) }
             } else {
                 HStack(spacing: metrics.spacing.sm) {
-                    Text("Send a message")
-                    KeyCapChip(text: "↵")
+                    Text("View history")
+                    HStack(spacing: metrics.spacing.xxs) {
+                        KeyCapChip(text: "⌘")
+                        KeyCapChip(text: "H")
+                    }
                 }
                 .font(metrics.typography.rowTrailing)
                 .foregroundStyle(Theme.Colors.textTertiary)

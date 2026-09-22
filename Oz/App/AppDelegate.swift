@@ -1,5 +1,4 @@
 import AppKit
-import CoreText
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var terminationRequestInFlight = false
@@ -7,14 +6,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Must land before the first scroll view exists, or the scroller switch shows as a flash.
     func applicationWillFinishLaunching(_ notification: Notification) {
         UserDefaults.standard.set("WhenScrolling", forKey: "AppleShowScrollBars")
-        registerThinkingFont()
-    }
-
-    private func registerThinkingFont() {
-        guard let fontURL = Bundle.main.url(
-            forResource: "MDThermochrome0.5-Light-Trial", withExtension: "otf")
-        else { return }
-        CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, nil)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {

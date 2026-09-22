@@ -224,6 +224,7 @@ private struct ChatMessageView: View {
 }
 
 private struct ThinkingIndicator: View {
+    @Environment(\.metrics) private var metrics
     let status: AIThinkingStatus
 
     @State private var isVisible = false
@@ -249,7 +250,7 @@ private struct ThinkingIndicator: View {
 
     private var reasoningWord: some View {
         Text(status.phrase)
-            .font(Theme.Typography.thinkingPhrase)
+            .font(metrics.typography.rowTitle)
             .tracking(0.9)
             .foregroundStyle(Theme.Colors.textPrimary.opacity(status.opacity))
     }

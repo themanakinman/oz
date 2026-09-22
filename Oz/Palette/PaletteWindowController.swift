@@ -362,6 +362,10 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
                 return true
             }
             guard let character = Self.commandCharacter(from: event) else { return false }
+            if self.core.palette.mode == .ai, character == "h" {
+                self.core.aiChatCoordinator.showHistory()
+                return true
+            }
             switch character {
             case ",":
                 self.core.settingsCoordinator.showSettings()
