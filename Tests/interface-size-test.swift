@@ -81,6 +81,7 @@ struct InterfaceSizeTests {
 
         expect(m.size.panelWidth, Theme.Size.panelWidth, "size.panelWidth")
         expect(m.size.panelHeight, Theme.Size.panelHeight, "size.panelHeight")
+        expect(m.size.launcherPanelHeight, Theme.Size.launcherPanelHeight, "size.launcherPanelHeight")
         expect(m.size.headerHeight, Theme.Size.headerHeight, "size.headerHeight")
         expect(m.size.headerIconSlot, Theme.Size.headerIconSlot, "size.headerIconSlot")
         expect(m.size.headerPadding, Theme.Size.headerPadding, "size.headerPadding")
@@ -284,6 +285,7 @@ struct InterfaceSizeTests {
             ("radius.card", m.radius.card), ("radius.keyCap", m.radius.keyCap),
             ("radius.tooltip", m.radius.tooltip),
             ("size.panelWidth", m.size.panelWidth), ("size.panelHeight", m.size.panelHeight),
+            ("size.launcherPanelHeight", m.size.launcherPanelHeight),
             ("size.headerHeight", m.size.headerHeight),
             ("size.headerIconSlot", m.size.headerIconSlot),
             ("size.headerPadding", m.size.headerPadding),

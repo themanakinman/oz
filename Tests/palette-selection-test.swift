@@ -191,10 +191,10 @@ struct PaletteRowIndexTests {
             "the last row of the last section is the last index")
         expectRoundTrip(launcher, "launcher shape")
 
-        // The empty-query launcher: favourites, then one section per kind in AppIndex slice order.
-        let launcherSections = PaletteRowIndex(sectionCounts: [3, 12, 5, 2, 4, 6, 8, 1, 7])
-        expect(launcherSections.sectionCounts.count == 9, "the empty-query launcher has nine sections")
-        expect(launcherSections.count == 48, "every section's rows are selectable, its header is not")
+        // The empty-query launcher: every category, plus Files & Folders, is capped at five rows.
+        let launcherSections = PaletteRowIndex(sectionCounts: [3, 5, 5, 2, 4, 5, 5, 1, 5, 5])
+        expect(launcherSections.sectionCounts.count == 10, "the empty-query launcher has ten sections")
+        expect(launcherSections.count == 40, "every capped section's rows are selectable, its header is not")
         expect(
             launcherSections.row(at: 0), .element(section: 0, offset: 0),
             "a pinned favourite is the first row of the whole list")
@@ -204,39 +204,44 @@ struct PaletteRowIndexTests {
         expect(
             launcherSections.row(at: 3), .element(section: 1, offset: 0),
             "Applications begins where Favorites ends, with no index spent on the header")
-        expect(launcherSections.index(section: 8, offset: 6), 47, "the last command is the last index")
-        expect(launcherSections.index(section: 9, offset: 0), nil, "there is no tenth section")
-        expectRoundTrip(launcherSections, "launcher nine sections")
+        expect(
+            launcherSections.index(section: 9, offset: 4), 39,
+            "the fifth file or folder is the last visible result")
+        expect(launcherSections.index(section: 10, offset: 0), nil, "there is no eleventh section")
+        expectRoundTrip(launcherSections, "launcher ten capped sections")
 
         // No favourites: Applications leads and every later section shifts up.
-        let launcherNoFavorites = PaletteRowIndex(sectionCounts: [0, 12, 5, 2, 4, 6, 8, 1, 7])
+        let launcherNoFavorites = PaletteRowIndex(sectionCounts: [0, 5, 5, 2, 4, 5, 5, 1, 5, 5])
         expect(
             launcherNoFavorites.row(at: 0), .element(section: 1, offset: 0),
             "an empty Favorites section is stepped over, not landed in")
         expect(
-            launcherNoFavorites.index(section: 8, offset: 6), 44,
+            launcherNoFavorites.index(section: 9, offset: 4), 36,
             "dropping three favourites moves every later row up by three")
         expectRoundTrip(launcherNoFavorites, "launcher without favourites")
 
         // Hidden categories drop whole sections; the rows that remain keep their order.
-        let launcherHidden = PaletteRowIndex(sectionCounts: [3, 12, 0, 2, 0, 6, 0, 1, 7])
-        expect(launcherHidden.count == 31, "a hidden category contributes no rows")
+        let launcherHidden = PaletteRowIndex(sectionCounts: [3, 5, 0, 2, 0, 5, 0, 1, 5, 5])
+        expect(launcherHidden.count == 26, "a hidden category contributes no rows")
         expect(
-            launcherHidden.row(at: 15), .element(section: 3, offset: 0),
+            launcherHidden.row(at: 8), .element(section: 3, offset: 0),
             "Quicklinks follows Applications directly once System Settings is hidden")
         expectRoundTrip(launcherHidden, "launcher with hidden categories")
 
-        // A typed query collapses nine sections into one list, led by the card.
-        let launcherQuery = PaletteRowIndex(hasCalculator: true, sectionCounts: [9])
-        expect(launcherQuery.count == 10, "the card plus nine ranked matches")
+        // A typed query has its five application Results and five Files & Folders, led by the card.
+        let launcherQuery = PaletteRowIndex(hasCalculator: true, sectionCounts: [5, 5])
+        expect(launcherQuery.count == 11, "the card plus two five-result sections")
         expect(launcherQuery.row(at: 0), .calculator, "a typed calculation leads the results")
         expect(
             launcherQuery.row(at: 1), .element(section: 0, offset: 0),
             "the best-ranked match follows the card")
-        expect(launcherQuery.index(section: 0, offset: 8), 9, "the last match is the last index")
+        expect(launcherQuery.index(section: 0, offset: 4), 5, "the fifth app result is capped")
+        expect(
+            launcherQuery.index(section: 1, offset: 4), 10,
+            "the fifth file result is the last index")
         expectRoundTrip(launcherQuery, "launcher with a card")
 
-        // ↵, ⌘↵ and ⌃⇧Q resolve through this index, so only index 0 is ever the card.
+        // ↵, ⌘↵ and ⌃Q resolve through this index, so only index 0 is ever the card.
         for flat in 0..<launcherQuery.count {
             expect(
                 (launcherQuery.row(at: flat) == .calculator) == (flat == 0),
@@ -249,21 +254,21 @@ struct PaletteRowIndexTests {
         expect(launcherCardOnly.row(at: 0), .calculator, "the card is the whole list")
         expect(launcherCardOnly.clamped(6) == 0, "a stale selection clamps back onto the card")
 
-        // Each of the nine sections, alone and absent, with and without the card.
+        // Each of the ten capped sections, alone and absent, with and without the card.
         for hasCalculator in [false, true] {
-            for section in 0..<9 {
-                var only = [Int](repeating: 0, count: 9)
+            for section in 0..<10 {
+                var only = [Int](repeating: 0, count: 10)
                 only[section] = 3
                 let alone = PaletteRowIndex(hasCalculator: hasCalculator, sectionCounts: only)
                 expect(
                     alone.index(section: section, offset: 0), hasCalculator ? 1 : 0,
                     "section \(section) alone starts at the head of the list")
                 expectRoundTrip(alone, "only section \(section) calc=\(hasCalculator)")
-                var missing = [Int](repeating: 2, count: 9)
+                var missing = [Int](repeating: 2, count: 10)
                 missing[section] = 0
                 let gapped = PaletteRowIndex(hasCalculator: hasCalculator, sectionCounts: missing)
                 expect(
-                    gapped.count == (hasCalculator ? 1 : 0) + 16,
+                    gapped.count == (hasCalculator ? 1 : 0) + 18,
                     "hiding section \(section) drops exactly its rows")
                 expect(gapped.index(section: section, offset: 0), nil, "section \(section) has no rows")
                 expectRoundTrip(gapped, "section \(section) hidden calc=\(hasCalculator)")

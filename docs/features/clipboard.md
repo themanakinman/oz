@@ -8,10 +8,10 @@
   `ClipboardCoordinator.applyEnabled()` is the single place that applies it.
 - **↵ and ⌘↵ are one swapped pair, and `ClipboardCoordinator.activate(_:inverted:)` is the only
   place that reads which way round they sit.** `clipboardDefaultAction` names what ↵ does — paste
-  (the default) or copy — and ⌘↵ always does the other. ⌘1…⌘0 on a pin and a double-click go
+  (the default) or copy — and ⌘↵ always does the other. A double-click or Return on a pin goes
   through the same call, so no surface can drift from the setting; ⌥↵ pastes regardless, since
   keeping the window open is a paste-only idea. The ⌘K menu puts the default first with the ↵ chip.
-- **Clipboard writes stamp a private `internalType` marker** so the poller skips Tinycast's own writes.
+- **Clipboard writes stamp a private `internalType` marker** so the poller skips Oz's own writes.
   If the writer and the poller ever disagree, the app re-captures its own pastes in a loop.
 - **`Model/ClipboardStore.swift` keeps to Foundation plus SQLite3 and no other app source**, so
   `clipboard-test` can compile it standalone. It uses `isolated deinit` for its SQLite teardown.
@@ -27,7 +27,7 @@
 - **A `.file` entry references the file where it lies and never copies it.** Its absolute path is
   the `text` column, so the trigram index finds it by name or by folder for free, and `imagePath`
   stays nil — which is what keeps `prune`, `deleteBlob` and `owns` from ever reaching a file
-  Tinycast did not write. `kind` is a plain `TEXT` column, so the case cost no migration; an older
+  Oz did not write. `kind` is a plain `TEXT` column, so the case cost no migration; an older
   build simply fails to decode the row.
 - **A colour is parsed from the text on demand, never stored.** `ColorValue` is the single parser
   behind the clipboard's swatches and the launcher's colour card, so the two can never disagree
@@ -37,7 +37,7 @@
   or classify an entry by it. What an entry *is* still comes from the content that was captured.
 - **No recognition ever runs in the app process.** `ClipboardTextWorker` spawns one bundled
   `ClipboardTextHelper` per item and reaps it, which is the whole reason Vision's and PDFKit's
-  allocations do not accumulate in Tinycast. The helper is handed a path and answers with text.
+  allocations do not accumulate in Oz. The helper is handed a path and answers with text.
 
 ## Poll-based capture
 
@@ -50,7 +50,7 @@ branch untouched.
 
 `ClipboardManager.fileURLs(on:volatileRoots:)` takes both the pasteboard and the roots as
 parameters, so `pasteboard-test` can drive an `NSPasteboard.withUniqueName()` and its own scratch
-tree: a harness that touched `NSPasteboard.general` would land in the reader's own running Tinycast
+tree: a harness that touched `NSPasteboard.general` would land in the reader's own running Oz
 as a genuine copy. `PasteboardFiles` reads each item's own `public.file-url`, so a copied `http` URL stays a link;
 returns nil rather than an empty array, so the text branch runs; caps a batch at
 `maxCapturedFiles`, so a Finder select-all cannot insert ten thousand rows on one tick; and
@@ -63,11 +63,11 @@ the cap, and even a rejected modern file URL suppresses the legacy filenames fal
 `PasteboardFiles.urls(on:)` that attachments use is the same reader with no limit and no test.
 
 `ClipboardManager` runs a 0.5s `Timer` watching `NSPasteboard.general.changeCount`. To avoid
-re-capturing Tinycast's own writes, every write stamps a private `internalType` marker on the
+re-capturing Oz's own writes, every write stamps a private `internalType` marker on the
 pasteboard and the poller skips anything carrying it.
 
 `stop()` is the off switch: it drops the timer and the fast-user-switching observers, and clears the
-`isCapturing` flag that `prepareForTinycastPasteboardMutation` reads — so a paste Tinycast performs
+`isCapturing` flag that `prepareForOzPasteboardMutation` reads — so a paste Oz performs
 itself no longer drains the pasteboard into history either.
 
 Existing clips survive being switched off, since a history is captured rather than authored and
@@ -309,9 +309,9 @@ Pasting a pinned entry deliberately does **not** promote it: it holds its place 
 section, so `promote` skips pinned rows instead of rewriting the row and its FTS entry for no
 visible change.
 
-The ten palette slots shared with launcher favorites address this visible Pinned block too. A slot
-uses the current query and type filter, so its first entry is the first visible pin; a missing slot is
-a no-op. They are fixed to the physical number row, with ⌘1…⌘9 then ⌘0 as their labels.
+⌘1…⌘9 then ⌘0 immediately performs the corresponding visible clipboard result by physical number-row
+position. It follows the current query and type filter; holding ⌘ reveals each row's hint beside its
+metadata.
 
 `load` reads every pinned row plus the newest 1000 unpinned ones as two indexed branches over a
 partial index on `pinned_at` (`Tests/clipboard-test.swift` covers the shape). The single
@@ -321,7 +321,7 @@ at launch.
 
 ## Referenced files
 
-A file copied in Finder is recorded as a reference, never as a copy: Tinycast writes nothing to
+A file copied in Finder is recorded as a reference, never as a copy: Oz writes nothing to
 disk for it, and the row's path points at the original wherever it lies. That is the whole reason
 `imagePath` stays nil for a `.file` row — `owns()` is the one ownership rule, and a path it never
 sees can never be deleted by `deleteBlob` or a retention cut. `clipboard-test`'s
@@ -381,7 +381,7 @@ Support, on the boot volume, which is the same volume as almost every drop targe
 there defaults to a move, and a move carries the blob out of the history and strands its row. Only
 an `NSDraggingSource` can answer `sourceOperationMaskFor`, and `ClipDragView` answers `.copy` for
 every context. SwiftUI's `onDrag` takes an `NSItemProvider` and nothing else. A `.file` row is
-copy-only for the reverse reason: the path is the user's own file, and Tinycast must not move it.
+copy-only for the reverse reason: the path is the user's own file, and Oz must not move it.
 
 **It claims mouse-down, like `WindowDragHandle` does, because the hosting view eats the click
 first.** The overlay owns the whole press: select on the way down, activate on a double click, and

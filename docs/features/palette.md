@@ -302,7 +302,7 @@ setting (`AppSettings.openOnCursorScreen`, on by default):
 **Neither case may use `NSScreen.main`**, which is documented as the screen of the window with keyboard
 focus — the frontmost app's, wherever the user last clicked. It therefore follows the user across
 displays, which is the wrong answer for both settings and made the off case do exactly what turning it
-off was meant to stop ([#270](https://github.com/abue-ammar/tinycast/issues/270)). The menu-bar display
+off was meant to stop ([#270](https://github.com/abue-ammar/oz/issues/270)). The menu-bar display
 is the one whose `frame.origin` is `.zero`, which is what `primary` looks for.
 
 The cursor hit test is `NSMouseInRect(mouse, screen.frame, false)`, **not** `CGRect.contains`. A mouse
@@ -311,7 +311,7 @@ rows land in the half-open interval `(minY, maxY]`: the topmost row is exactly `
 excludes, while that same value is the `minY` of the display stacked above. `contains` would therefore
 hand a pointer parked at the top of one display to its neighbour. `NSMouseInRect` exists for this.
 
-## The placeholder is Tinycast's, not the field's
+## The placeholder is Oz's, not the field's
 
 The search field is a SwiftUI `TextField` with **no `prompt`**; `RootPaletteView` draws the
 placeholder itself as a leading-aligned background `Text`.
@@ -485,10 +485,10 @@ handled in `PalettePanel.sendEvent` before `super` hands the event to the respon
 
 - **A bare backspace** — the field editor consumes it as an edit (`onBareBackspace`).
 - **Chords with no main menu item** — ⌘, and ⌘w, which an app with a menu bar would never see here.
-- **The physical number-row slots.** `FavoriteSlots` matches ⌘1…⌘0 by key code before fixed command
-  chords, then publishes the resolved position to the active screen. Only the launcher and clipboard
-  screens intercept these slots; other screens keep their own ⌘-number shortcuts. The launcher's
-  compact visibility setting is visual only and does not disable its favorite slots.
+- **Result selection by number row.** ⌘1…⌘0 matches physical key codes before fixed command chords,
+  then publishes the zero-based result position to the active launcher or clipboard screen. The
+  selected result is activated immediately, and holding ⌘ reveals its command-number hint in the
+  row. Other screens keep their own ⌘-number shortcuts.
 - **Chords AppKit has already bound to a selector.** `⌘.` is the one that bites: AppKit binds it to
   `cancelOperation:` alongside Escape, so `interpretKeyEvents` hands it to the field editor and
   `onKeyPress(keys: ["."])` never fires. Pin (⌘.) therefore arrives through `onCommandShortcut`,

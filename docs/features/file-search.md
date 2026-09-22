@@ -1,9 +1,10 @@
 # Search Files
 
-Search Files is an on-demand palette screen for opening files and folders from the folders the user
-configures. It searches filenames through Spotlight, adds no private index or launch work, and is
-reached from the built-in Search Files launcher command — or its own global shortcut — after the
-feature is enabled in Settings.
+Search Files is the full palette screen for opening files and folders from the folders the user
+configures. Its first five relevant results also appear in the launcher's **Files & Folders** section,
+using the same filename search, scopes and ranking. It searches through Spotlight, adds no private
+index or launch work, and the dedicated screen remains available from the built-in Search Files
+launcher command or its global shortcut after the feature is enabled in Settings.
 
 ## Invariants
 
@@ -14,10 +15,10 @@ feature is enabled in Settings.
 - **Everything under `Model/` stays Foundation-only and pure**, `FileSearchIgnoreList`'s `import Darwin`
   and `FileSearchFilter`'s `UniformTypeIdentifiers` included — value types with no environment of their
   own. `file-search-test` compiles the shipped files together with the existing pure fuzzy scorer.
-- **Search is filename-only, and every list comes from Spotlight.** Tinycast creates no content index,
+- **Search is filename-only, and every list comes from Spotlight.** Oz creates no content index,
   history, query cache, watcher or search data — the blank screen's Recently Used rows are one more
   Spotlight query over the configured scopes, read from the system's own `kMDItemLastUsedDate` and
-  `kMDItemFSContentChangeDate`, never from anything Tinycast recorded. The type filter narrows *which*
+  `kMDItemFSContentChangeDate`, never from anything Oz recorded. The type filter narrows *which*
   files Spotlight is asked for; it never adds a second pass over the ones it returned.
 - **The filter belongs to the query, not to the rows.** `FileSearchSession` keys its de-dup and its
   supersession check on the query and the filter together, so narrowing re-runs the same words rather
@@ -25,16 +26,16 @@ feature is enabled in Settings.
 - **Hidden paths and application-bundle contents are structural, not patterns.** They are what keeps
   the feature permission-free, so no user setting can re-admit them. Everything else that is dropped
   comes from the ignore list.
-- **`~/Library` is never a scope Tinycast picks by itself.** A configured home root expands into its
+- **`~/Library` is never a scope Oz picks by itself.** A configured home root expands into its
   visible children plus the two cloud-storage roots instead. A user who adds a folder under `~/Library`
   by hand gets what they asked for.
 - **The shipped ignore rules are compiled in and never persisted.** `fileSearchIgnorePatterns` stores
   only what the user added, so changing `FileSearchIgnoreList.defaults` reaches installs that already
   ran. The consequence is that the shipped six cannot be switched off.
-- **File Search is off by default, and off means no entry point or Spotlight work.** A nonempty query
-  on that screen is the first operation that searches, and the global shortcut no-ops while the
-  feature switch is off.
-- **Tinycast asks for no file permission.** Hidden metadata items and application bundles are filtered,
+- **File Search is off by default, and off means no entry point or Spotlight work.** When enabled,
+  the launcher and the dedicated screen share one session, so opening or typing either can search;
+  the global shortcut still no-ops while the feature switch is off.
+- **Oz asks for no file permission.** Hidden metadata items and application bundles are filtered,
   and Spotlight or TCC omissions produce a thinner result set rather than a prompt for Full Disk Access.
 - **A superseded query never publishes.** The session cancels its pending task and checks cancellation
   after the synchronous Spotlight call, so a late result cannot replace the newer query's rows. Editing
@@ -49,10 +50,12 @@ words in the filename without requiring them to be adjacent or in that order. Th
 `kMDItemContentTypeTree` clause joins them, ahead of the ignore-list exclusions.
 
 `FileSearchSession.search` retains the previous rows, debounces for 120 ms, then drives
-`FileSearchService.search` in a detached user-initiated task. One worker serializes synchronous
-Spotlight calls and coalesces changes to the newest pending query, so slower typing cannot accumulate
-overlapping queries. The session owns *when* a search runs and nothing else — the expressions are the
-service's, built where the policy that shapes them already is. The service resolves the configured roots,
+`FileSearchService.search` in a detached user-initiated task. The launcher invokes the session with an
+unfiltered query and renders its first five rows; the dedicated screen passes its selected type filter
+and renders the full result list. One worker serializes synchronous Spotlight calls and coalesces changes
+to the newest pending query, so slower typing cannot accumulate overlapping queries. The session owns
+*when* a search runs and nothing else — the expressions are the service's, built where the policy that
+shapes them already is. The service resolves the configured roots,
 then keeps every `MDQuery` reference inside one nonisolated synchronous function. Spotlight returns at
 most 1,000 candidates. `FileSearchQuery` removes hidden path components and app-bundle contents, applies
 the ignore list, then applies `FuzzyMatch` and publishes at most 200. Localized filename then path order
@@ -133,7 +136,7 @@ revision check, then the same worker runs only the newest pending query. Leaving
 cancels and clears the session as well.
 
 `FileSearchService.search` emits a `FileSearchService.search` interval on the shared
-`com.tinycast.perf` signpost subsystem. `Tests/file-search-performance.swift` exercises the same service
+`com.oz.perf` signpost subsystem. `Tests/file-search-performance.swift` exercises the same service
 against the current user's Spotlight index and reports first-run and repeated-query latency; it stays
 outside `run-tests.sh` because filesystem contents and Spotlight state are machine-dependent.
 
@@ -154,7 +157,7 @@ magnitude, not budgets; rerun the benchmark after query-policy work.
 draws. The list uses the shared Results header, row metrics, edge dissolve, thin scrollbar and scroll
 intent; its header reads **Recently Used** on the blank screen and **Results** under a query. A row shows
 a fitted native file icon and the full filename — a folder prefixed by its parent's name, dimmed, since
-half the folder hits on a developer machine are some `src` or `Tinycast`. The path itself is the preview's
+half the folder hits on a developer machine are some `src` or `Oz`. The path itself is the preview's
 `Where` row rather than a second column the narrow list has no width for. A click selects and a double
 click opens, both through `onRowClick`, which answers on the press: `.onTapGesture(count: 2)` makes the
 single tap wait out the system's double-click interval first, and that wait *is* the second a click used
@@ -224,14 +227,15 @@ says "File search is unavailable" inline.
 
 Settings ▸ File Search owns the `fileSearchEnabled` switch, which is off when its preference is absent,
 along with the scope list, the ignore patterns and the Search Files command row. All of them are
-ordinary settings carried by Tinycast settings backups; importing them grants no permission or
+ordinary settings carried by Oz settings backups; importing them grants no permission or
 background access.
 
 `AppCore` observes the switch and asks `FileSearchCoordinator` to project `CommandID.searchFiles` into
 the launcher; a second observation rebuilds the policy when either list changes. The coordinator also
 guards entry into `.fileSearch`, so neither a stale selected command nor the global shortcut can open
-the screen after the feature is disabled. Disabling cancels the session and returns an open File Search
-screen to the launcher without changing palette visibility.
+the screen after the feature is disabled. The palette coordinator starts the same session for the
+launcher while enabled, and disabling cancels it, removes the home Files & Folders section, and returns
+an open File Search screen to the launcher without changing palette visibility.
 
 Search Files is bindable like every other built-in command — `AppEntry.hotKeyAction` answers
 `.command(.searchFiles)`, so its launcher row prints a bound chord as a keycap.

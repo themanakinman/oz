@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://tinycast.dev/sitemap.xml
+Sitemap: https://oz.dev/sitemap.xml

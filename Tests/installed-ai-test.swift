@@ -228,8 +228,8 @@ struct InstalledAITests {
         if let index = argv.firstIndex(of: "--prompt-file"), index + 1 < argv.count {
             let name = URL(fileURLWithPath: argv[index + 1]).lastPathComponent
             expect(
-                name.hasPrefix("tinycast-prompt-") && name.hasSuffix(".txt")
-                    && name != "tinycast-prompt.txt",
+                name.hasPrefix("oz-prompt-") && name.hasSuffix(".txt")
+                    && name != "oz-prompt.txt",
                 "Grok prompt file is unique per turn")
         }
         expect(

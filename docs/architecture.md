@@ -1,6 +1,6 @@
 # Architecture
 
-How Tinycast is wired together. Per-feature internals live in [features/](README.md#features);
+How Oz is wired together. Per-feature internals live in [features/](README.md#features);
 conventions for writing new code live in [standards.md](standards.md).
 
 ## The layering
@@ -114,7 +114,7 @@ handed an input path and answers with bounded text down a pipe.
 
 ## Entry points and windows
 
-`TinycastApp` (`@main`) declares only two `MenuBarExtra` scenes — Tinycast's own item and the
+`OzApp` (`@main`) declares only two `MenuBarExtra` scenes — Oz's own item and the
 calendar's, each inserted by one preference and independent of the other; everything else visible is
 driven imperatively from AppKit. Extension menu extras are dynamic `NSStatusItem`s owned entirely by
 `Features/Extensions/`, through `ExtensionManager`, with no scene or lifecycle wiring in the core.
@@ -136,7 +136,7 @@ driven imperatively from AppKit. Extension menu extras are dynamic `NSStatusItem
   literal source, switches among local Markdown files and stays visible on focus loss. The displayed
   string is the canonical file source; there is no source/display mapping.
   See [features/notes.md](features/notes.md).
-- **The main menu** — shaped by `TinycastApp`'s `.commands`, which rebinds ⌘Q to Close Settings. It is
+- **The main menu** — shaped by `OzApp`'s `.commands`, which rebinds ⌘Q to Close Settings. It is
   only ever on screen while a titled window is open, so it is Settings' menu bar. It must stay
   declarative.
 - **Dialogs** — borderless `DialogPanel`s driven by `DialogController`, the app's only presenter for
@@ -204,7 +204,7 @@ The folder layout is the layering above, made navigable — one folder per featu
 everything that feature owns.
 
 ```
-Tinycast/
+Oz/
   App/              @main, AppDelegate, AppCore — the composition root
   DesignSystem/     Theme (the token source), KeyCapChip, Tooltip, SymbolImage,
                     VisualEffectView, PopoverMenu, SettingsComponents, Scrolling/, Interaction/

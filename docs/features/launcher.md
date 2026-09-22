@@ -62,7 +62,7 @@ lives — `/Applications/Safari.app` is a symlink flagged hidden, so `.skipsHidd
 Finder ships as an individual bundle scope rather than by adding `/System/Library/CoreServices`, which
 holds ~120 background-agent bundles. There is no reliable way to filter those: `LSUIElement`,
 `LSBackgroundOnly` and "declares no icon" each also exclude legitimately launchable apps — Raycast,
-Stats, Tinycast itself, Mission Control, Siri, Time Machine, Screenshot, System Information, Font
+Stats, Oz itself, Mission Control, Siri, Time Machine, Screenshot, System Information, Font
 Book. Don't reintroduce such a heuristic.
 
 `AppIndex.start(settings:)` observes `$searchScopes`, so an edit re-indexes immediately; overlapping
@@ -84,7 +84,7 @@ next naming demand is a new producer, not a new rung.
 
 | Role | What lands in it | Looseness |
 | --- | --- | --- |
-| `.userAlias` | the alias the user typed in Tinycast, for any entry kind | literal |
+| `.userAlias` | the alias the user typed in Oz, for any entry kind | literal |
 | `.name` | display name, a snippet's keyword, an `.app` bundle the user renamed on disk | fuzzy |
 | `.translation` | localizations, Spotlight alternate names, romanizations | fuzzy |
 | `.owner` | the extension a command came from | literal |
@@ -238,10 +238,11 @@ away from a real entry: `System Settings` names both a category and an installed
 collision is answered rather than avoided — an entry whose display name equals the query joins the
 listing, so the app appears under Applications above the panes. Since slice order is section order
 (`publishEntries`), `categoryListing` is a filter with no sort, and the sectioned view stays 1:1 with the
-flat selection. Visibility still applies downstream, and no `limit` does, matching the empty query.
+flat selection. Visibility still applies downstream; the shared five-row section cap then keeps one
+category from filling the whole palette, matching the empty query.
 
 `LauncherScreen` therefore separates the two jobs the empty query used to do at once: `showSections`
-draws the headers, `pinsFavorites` pins the Favorites prefix and hands out the ⌘-digit slots. A category
+draws the headers and `pinsFavorites` pins the Favorites prefix. A category
 listing takes the first only. Opening a row from one also records nothing in `LauncherRankingStore` — a
 category word is not a search for the row that ran, and learning it would rank that row under `s`.
 
@@ -257,7 +258,7 @@ handler through `AppLauncher.open`.
 The shape a query has to have is `QuicklinkDestination.detect` returning `.web`, reused rather than
 re-written so `github.com` and `https://…` mean the same thing here as they do in a quicklink. The
 entry is an ordinary `.command`, so `VisibilityStore` still gates it — Commands off hides the row —
-and its `url` carries the destination instead of the catalog's `tinycast://` placeholder. Nothing
+and its `url` carries the destination instead of the catalog's `oz://` placeholder. Nothing
 learns from it and nothing pins it: `LauncherCoordinator.launch` skips `LauncherRankingStore` for a
 contextual row, the way it already skips a category listing, since a pasted URL is not a term any
 row should rank under; and ⇧⌘F and ⇧⌘H are both refused, because a favorite — or a hidden-item key —
@@ -265,6 +266,23 @@ the empty query can never resolve is dead state a backup would then carry.
 
 The row prints `AppEntry.subtitle` beside its name — the one field for an entry whose name alone
 can't say what it acts on.
+
+### Five-result sections and files
+
+Every launcher section is a five-result shortlist: Favorites, Applications, System Actions,
+Quicklinks, each other entry kind, generic Results, and `Use “…” with…` all keep their ranked first
+five rows. The cap is applied before the flat selection order is built, so arrow keys and ⌘1…⌘0 never
+land on a row that is not drawn.
+
+The expanded launcher viewport sizes itself to the total selectable rows currently returned, up to
+nine rows. A query with only two fallback rows therefore uses a two-row viewport; ten combined rows,
+such as five Results and five Files & Folders, use a nine-row viewport and scroll for the last row.
+
+Enabled File Search also contributes a **Files & Folders** section to the home search. It shares the
+same Spotlight-backed `FileSearchSession` and configured scopes as Search Files, showing its first five
+recent items on an empty query or its first five ranked filename matches while typing. File rows open,
+reveal in Finder, Quick Look, copy, paste, and trash through the same actions as the dedicated screen;
+the dedicated Search Files command remains the full, filterable browser.
 
 ### Fallbacks
 
@@ -429,7 +447,7 @@ other `z…` pick, so its override budget collapses on its own.
 
 ## System actions
 
-`SystemActionCatalog` is a Foundation-only inventory of the macOS actions Tinycast exposes. Its
+`SystemActionCatalog` is a Foundation-only inventory of the macOS actions Oz exposes. Its
 stable entry IDs, labels, symbols and confirmation policy are covered by
 `Tests/system-action-test.swift`; platform side effects live separately in `SystemActionRunner`.
 `SystemActionCoordinator.runSystemAction(id:)` remains the one execution funnel — shared by palette activation and a
@@ -449,14 +467,14 @@ Public AppKit, CoreAudio and workspace APIs are preferred. Actions without a sta
 use fixed system tools, Apple Events, Accessibility, or a dynamically resolved Bluetooth power API.
 Those routes run only on explicit activation. Automation, Accessibility or Bluetooth permission is
 requested at first use, and denial produces an alert linking to the relevant System Settings pane.
-Toggle System Appearance changes macOS; Tinycast follows it only while its own Appearance is System.
+Toggle System Appearance changes macOS; Oz follows it only while its own Appearance is System.
 
 Restart, Shut Down, Log Out, Empty Trash and Quit All Applications confirm before execution: ↵ runs
-the action, Escape cancels. Every dialog is Tinycast's own: confirmations, failure reports and the Set
+the action, Escape cancels. Every dialog is Oz's own: confirmations, failure reports and the Set
 Volume slider all render through `DialogController` rather than an `NSAlert`
 (see [ui.md](../ui.md#dialogs--hud)). Each confirmation carries the action's own icon — Restart shows
 `arrow.clockwise`, Empty Trash `trash.slash` — so the dialog is recognizably about the row that
-opened it. Volume and mute actions also show Tinycast's transient volume HUD, since macOS only draws
+opened it. Volume and mute actions also show Oz's transient volume HUD, since macOS only draws
 its own for real media keys. Volume Up/Down walk a 5% grid (`VolumeLevel.stepped`, covered by
 `Tests/volume-test.swift`): an off-grid level snaps to the next line rather than past it, so from 37%
 up lands on 40% and down on 35%, and repeated presses stay on round numbers.
@@ -551,7 +569,7 @@ them. **There is deliberately no `Enable Quick Actions` category toggle** either
 
 Activation hands the action to `QuickActionCoordinator.run(_:)` **without** hiding the palette first:
 the coordinator reads the displaced app and then hides, because after the hide the frontmost app is
-Tinycast. See [quick-actions.md](quick-actions.md).
+Oz. See [quick-actions.md](quick-actions.md).
 
 ## Notes commands
 
@@ -591,7 +609,7 @@ entries — no new `AppEntry.Kind` and no `VisibilityStore` category — owned b
 through `SettingsTab.ownedCommands`, so `navigationEnabled` is their switch. Their invariants and
 internals live in [navigation.md](navigation.md) and [menu-search.md](menu-search.md).
 
-> **Invariant:** `Tests/fuzz-test.swift` compiles the real `Tinycast/Features/Launcher/Model/SearchRelevance.swift`, so
+> **Invariant:** `Tests/fuzz-test.swift` compiles the real `Oz/Features/Launcher/Model/SearchRelevance.swift`, so
 > that file must stay Foundation-only and pure. There is no copy of the scorer to keep in sync.
 
 The ranking harness covers prefix learning, frequency/recency scoring, persistence, and both reset
@@ -622,6 +640,10 @@ empty, where `AppIndex.orderedResults` pins it as a prefix of the results. `Laun
 that prefix once in `init` (`favoriteCount`), and the list, the reorder rows and the chord guards all
 read that one number, so the visible section and what a move acts on can't disagree.
 
+The root list shows the first five favorites. Additional saved favorites remain intact and searchable;
+the compact strip has no overflow affordance because expanding the launcher intentionally keeps the
+same five-result section cap.
+
 The ⌘K menu carries **Add / Remove from Favorites** (⇧⌘F) plus **Move Favorite Up / Down** (⌥⌘↑ /
 ⌥⌘↓). A move row is only built in a direction that exists, so the first favorite has no Up row and
 the last has no Down.
@@ -642,30 +664,12 @@ highlight lands differs on purpose: a **move** follows the entry, since the poin
 where that entry now sits, while a **toggle** stays with the section rather than chasing an entry
 across the list — the top of Favorites on add, the neighbour above the one that left on remove.
 
-### ⌘-digit slots
+### ⌘-digit result selection
 
-`FavoriteSlots` (`Launcher/Model/FavoriteSlots.swift`) defines ten local palette slots: **⌘1…⌘9 then
-⌘0**. They match the physical number row, not the character produced by the current keyboard layout,
-so the same positions work on QWERTY and AZERTY. The same slots address pinned Clipboard entries in
-that screen; the eleventh favorite is still listed and reorderable, and simply has no slot.
-
-Both palette sizes serve the chords from the same prefix, because `paletteIsCollapsed` already
-requires an empty query: **compact implies empty implies `favoriteCount` is the pinned prefix**. That
-is why `LauncherScreen.pinnedFavorites` feeds the strip, the chords and the numbered rows alike,
-rather than the compact bar re-deriving an empty-query order of its own. In compact the strip draws
-the first five; ⌘6–⌘0 still launch favorites it has no room for, and the "…" is a button after them
-rather than a slot, so no favorite loses its digit to the overflow.
-
-Holding ⌘ swaps each numbered row's kind label for its chord. `PalettePanel` publishes the modifier
-into `PaletteState.commandHeld` from `.flagsChanged` and clears it in `resignKey` — not in `prepare`,
-which a re-show that preserves state skips entirely. The flag flips **400 ms after** the press, not
-on it: every ⌘ chord in the palette starts as a ⌘ press, so revealing on the down edge flashed the
-numbering under ⌘↵ and ⌘K. `noteCommandHeld` schedules the reveal and any release cancels it, so a
-chord's own tap never outlives its keystroke while a deliberate hold still lights every row. **`AppRow` observes that flag itself**: reading
-it any higher would attach it to `RootPaletteView`'s body and rebuild the whole palette on every ⌘
-press, where a row-level read re-runs only the handful of rows the `LazyVStack` has realized. The
-digit each row shows is carried on its `Row` case from the section build, so no row searches for its
-own position.
+On the launcher and clipboard screens, **⌘1…⌘9 then ⌘0** immediately performs the corresponding
+visible result by physical number-row position. While ⌘ is held, each row reveals its command-number
+hint beside its normal trailing metadata. These chords replace the former favorite and pinned
+clipboard shortcuts, so favorite icons remain click targets and no longer claim command-number keys.
 
 ## Hiding one result
 
@@ -705,7 +709,7 @@ the key handler read, so the advertised chord can't drift from the behavior.
 running dot and the availability of the running-only actions:
 
 - **Quit Application** — a row of an app's ⌘K Actions menu, shown only while that app is
-  running, also bound to **⌃⇧Q** on the selected row. The chord guard mirrors the menu row's
+  running, also bound to **⌃Q** on the selected row. The chord guard mirrors the menu row's
   condition (an `.application` entry that `RunningAppsMonitor` reports running) so the key never
   swallows a press it won't act on, and it's skipped in the compact bar, which shows no selection.
   `AppLauncher.quit(bundleID:)` terminates every instance of the bundle and reports whether
@@ -721,7 +725,7 @@ running dot and the availability of the running-only actions:
   moment the quit is asked for and never restores focus — either the relaunch takes it, or the app
   that refused the quit is the one asking for it.
 - **Quit All Applications** a system action. `AppLauncher.quitAllTargets()` is the
-  policy (every `.regular` app except Finder — `terminate()` only relaunches it — and Tinycast,
+  policy (every `.regular` app except Finder — `terminate()` only relaunches it — and Oz,
   excluded by PID because About/Settings temporarily flips it to `.regular`). `SystemActionCoordinator.quitAllApps()`
   resolves that list **once**, confirms it with an `NSAlert`, then terminates exactly what was
   confirmed. The palette hides before the alert — it is a floating panel and would sit above it.
