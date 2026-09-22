@@ -5,7 +5,7 @@ struct ChatTranscriptView: View {
 
     @Environment(\.metrics) private var metrics
     let messages: [ChatMessage]
-    let status: String?
+    let status: AIThinkingStatus?
     let usage: AIUsage?
     /// Cleared when the reader scrolls up, so a streaming reply stops dragging them back down.
     @State private var followsTail = true
@@ -115,7 +115,7 @@ private struct ChatMessageView: View {
 
     @Environment(\.metrics) private var metrics
     let message: ChatMessage
-    let status: String?
+    let status: AIThinkingStatus?
 
     @State private var hovered = false
 
@@ -162,11 +162,8 @@ private struct ChatMessageView: View {
         if message.text.isEmpty, message.searches.isEmpty, message.toolUses.isEmpty,
             message.state == .streaming
         {
-            HStack(spacing: metrics.spacing.sm) {
-                ProgressView().controlSize(.small)
-                if let status { Text(status).foregroundStyle(.secondary) }
-            }
-            .padding(metrics.spacing.md)
+            ThinkingIndicator(status: status ?? AIThinkingStatus(phrase: "Thinking", opacity: 1))
+                .padding(metrics.spacing.md)
         } else {
             bubbleContent
                 .font(metrics.typography.rowTitle)
@@ -223,6 +220,52 @@ private struct ChatMessageView: View {
         } else {
             Text(message.text)
         }
+    }
+}
+
+private struct ThinkingIndicator: View {
+    let status: AIThinkingStatus
+
+    @State private var isVisible = false
+    var body: some View {
+        HStack(spacing: 6) {
+            reasoningWord
+            HStack(spacing: 0) {
+                ForEach(0..<3) { index in
+                    ThinkingDot(index: index)
+                }
+            }
+            .padding(.leading, -5)
+        }
+        .opacity(isVisible ? 1 : 0)
+        .offset(y: isVisible ? 0 : 3)
+        .animation(.easeOut(duration: 0.18), value: isVisible)
+        .onAppear {
+            isVisible = true
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(status.phrase)…")
+    }
+
+    private var reasoningWord: some View {
+        Text(status.phrase)
+            .font(Theme.Typography.thinkingPhrase)
+            .tracking(0.9)
+            .foregroundStyle(Theme.Colors.textPrimary.opacity(status.opacity))
+    }
+}
+
+private struct ThinkingDot: View {
+    let index: Int
+
+    var body: some View {
+        Text(".")
+            .phaseAnimator([CGFloat(0), -2, 0, 2, 0]) { dot, offset in
+                dot.offset(y: offset)
+            } animation: { _ in
+                .easeInOut(duration: 0.18).delay(Double(index) * 0.1)
+            }
+            .accessibilityHidden(true)
     }
 }
 

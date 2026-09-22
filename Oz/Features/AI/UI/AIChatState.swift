@@ -1,12 +1,27 @@
 import Foundation
 import Observation
 
+struct AIThinkingStatus: Equatable, Sendable {
+    let phrase: String
+    let opacity: Double
+
+    static let phrases = [
+        AIThinkingStatus(phrase: "Thinking", opacity: 1),
+        AIThinkingStatus(phrase: "Rummaging", opacity: 0.9),
+        AIThinkingStatus(phrase: "Grandiosing", opacity: 0.8),
+        AIThinkingStatus(phrase: "Speculating", opacity: 0.7),
+        AIThinkingStatus(phrase: "Debating", opacity: 0.6),
+        AIThinkingStatus(phrase: "Contemplating", opacity: 0.5),
+    ]
+}
+
 @MainActor
 @Observable
 final class AIChatState {
     private(set) var session = ChatSession()
     private(set) var isStreaming = false
     private(set) var isThinking = false
+    private(set) var thinkingStatus: AIThinkingStatus?
     private(set) var usage: AIUsage?
     private(set) var notice: String?
     /// Files staged for the next message; they go out with whatever is typed next.
@@ -22,6 +37,7 @@ final class AIChatState {
     @ObservationIgnored private var pendingText = ""
     @ObservationIgnored private var flushTask: Task<Void, Never>?
     @ObservationIgnored private var lastFlush = ContinuousClock().now
+    @ObservationIgnored private var previousThinkingPhraseIndex: Int?
 
     private static let flushInterval: Duration = .milliseconds(40)
 
@@ -47,7 +63,7 @@ final class AIChatState {
             messages: session.requestMessages(textBudget: contextBudget), webSearch: webSearch)
         session.append(ChatMessage(role: .assistant, text: "", state: .streaming))
         isStreaming = true
-        isThinking = false
+        beginThinking()
         usage = nil
         history.save(session)
 
@@ -166,8 +182,8 @@ final class AIChatState {
         clearStaging()
     }
 
-    /// The line shown in the empty streaming bubble while nothing has arrived yet.
-    var liveStatus: String? { isThinking ? "Thinking…" : nil }
+    /// The status shown in the empty streaming bubble until the first response content arrives.
+    var liveStatus: AIThinkingStatus? { isThinking ? thinkingStatus : nil }
 
     var lastAssistantText: String? {
         session.messages.last(where: { $0.role == .assistant && !$0.text.isEmpty })?.text
@@ -217,6 +233,15 @@ final class AIChatState {
         case .finished:
             finishLast(state: .complete, fallback: "No response")
         }
+    }
+
+    private func beginThinking() {
+        let choices = AIThinkingStatus.phrases
+        let eligibleIndices = choices.indices.filter { $0 != previousThinkingPhraseIndex }
+        let index = eligibleIndices.randomElement() ?? choices.startIndex
+        previousThinkingPhraseIndex = index
+        thinkingStatus = choices[index]
+        isThinking = true
     }
 
     /// A due leading flush keeps the first token instant; the trailing task coalesces the rest.
