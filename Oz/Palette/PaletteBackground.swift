@@ -42,3 +42,30 @@ struct PaletteBackground: View {
         window.invalidateShadow()
     }
 }
+
+/// Applies the palette's live scrim and backdrop material to controls that float over its rows.
+private struct PaletteSurface<S: Shape>: ViewModifier {
+    @Environment(AppSettings.self) private var settings
+    let shape: S
+
+    func body(content: Content) -> some View {
+        content.background {
+            ZStack {
+                shape.fill(.regularMaterial)
+                shape.fill(Theme.Colors.panelScrim(transparency: settings.paletteTransparency))
+            }
+            .overlay {
+                shape.stroke(
+                    Theme.Colors.panelEdgeHighlight(transparency: settings.paletteTransparency),
+                    lineWidth: Theme.Size.hairline)
+            }
+            .clipShape(shape)
+        }
+    }
+}
+
+extension View {
+    func paletteSurface(in shape: some Shape) -> some View {
+        modifier(PaletteSurface(shape: AnyShape(shape)))
+    }
+}

@@ -48,9 +48,9 @@ struct RootPaletteView: View {
 
     /// The AppKit panel only needs the launcher's current selectable rows, capped at its viewport.
     private var launcherRowCountForSizing: Int {
-        vm.mode == .launcher
-            ? min(screen.rows.count, Theme.Size.launcherVisibleRows)
-            : Theme.Size.launcherVisibleRows
+        guard vm.mode == .launcher else { return Theme.Size.launcherVisibleRows }
+        let rowCount = (screen as? LauncherScreen)?.viewportRowCount ?? screen.rows.count
+        return min(rowCount, Theme.Size.launcherVisibleRows)
     }
 
     /// The current mode's screen: its rows are the visible order the flat selection indexes.
@@ -284,7 +284,7 @@ struct RootPaletteView: View {
                     }
                 }
                 .safeAreaInset(edge: .top, spacing: 0) { header }
-                .safeAreaInset(edge: .bottom, spacing: 0) {
+                .overlay(alignment: .bottom) {
                     if !isCollapsed {
                         bottomBar(
                             pillLabel: screen.primaryActionTitle, showActionGroup: showActionGroup,
@@ -935,7 +935,7 @@ struct RootPaletteView: View {
             }
         }
         .padding(metrics.spacing.xs)
-        .frosted(in: Capsule())
+        .paletteSurface(in: Capsule())
     }
 
     /// The one path opening the Actions menu, sampling the state its rows depend on.
@@ -1428,7 +1428,7 @@ private struct MenuCircleButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovered = $0 }
-        .frosted(in: Circle())
+        .paletteSurface(in: Circle())
     }
 }
 

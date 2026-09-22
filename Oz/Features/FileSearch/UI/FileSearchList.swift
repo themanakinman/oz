@@ -55,6 +55,8 @@ struct FileSearchRow: View {
     let selected: Bool
     /// The root search lends its ⌘1…⌘0 hints; the dedicated screen has none to show.
     var resultIndex: Int? = nil
+    /// Root launcher results dim until selected or hovered; full File Search keeps its row styling.
+    var dimWhenUnselected = false
     var onActivateFromDragHandle: (() -> Void)?
     @Environment(PaletteState.self) private var palette
     @State private var image: NSImage?
@@ -62,19 +64,26 @@ struct FileSearchRow: View {
 
     init(
         result: FileSearchResult, selected: Bool, resultIndex: Int? = nil,
+        dimWhenUnselected: Bool = false,
         onActivateFromDragHandle: (() -> Void)? = nil
     ) {
         self.result = result
         self.selected = selected
         self.resultIndex = resultIndex
+        self.dimWhenUnselected = dimWhenUnselected
         self.onActivateFromDragHandle = onActivateFromDragHandle
         _image = State(initialValue: IconCache.cachedFitted(forFile: result.id))
     }
 
     private var fill: Color {
+        if dimWhenUnselected { return .clear }
         if selected { return Theme.Colors.selection }
         if hovered { return Theme.Colors.rowHover }
         return .clear
+    }
+
+    private var contentOpacity: Double {
+        !dimWhenUnselected || selected || hovered ? 1 : 0.38
     }
 
     /// A folder is named by where it sits: half the hits are some `src` or `Oz`.
@@ -82,6 +91,13 @@ struct FileSearchRow: View {
         guard result.isDirectory, !result.parentName.isEmpty else { return Text(result.name) }
         let parent = Text("\(result.parentName)/").foregroundStyle(.secondary)
         return Text("\(parent)\(result.name)")
+    }
+
+    private var pathMetadata: String {
+        result.parentPath.split(separator: "/")
+            .filter { $0 != "~" }
+            .suffix(2)
+            .joined(separator: "/")
     }
 
     var body: some View {
@@ -95,11 +111,20 @@ struct FileSearchRow: View {
                 }
             }
             .frame(width: metrics.size.rowIcon, height: metrics.size.rowIcon)
-            // The column is too narrow for a path beside the name; the preview states it instead.
-            label
-                .font(metrics.typography.rowTitle)
-                .lineLimit(1)
-                .truncationMode(.middle)
+            HStack(alignment: .firstTextBaseline, spacing: metrics.spacing.sm) {
+                label
+                    .font(metrics.typography.rowTitle)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .layoutPriority(1)
+                if !result.isDirectory, !pathMetadata.isEmpty {
+                    Text(pathMetadata)
+                        .font(metrics.typography.rowTrailing)
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+            }
             Spacer(minLength: 0)
             if resultIndex != nil {
                 Text(result.isDirectory ? "Folder" : "File")
@@ -120,14 +145,21 @@ struct FileSearchRow: View {
             RoundedRectangle(cornerRadius: metrics.radius.row, style: .continuous)
                 .fill(fill)
         )
-        .armedHover($hovered)
+        .opacity(contentOpacity)
+        .armedHover($hovered) {
+            if dimWhenUnselected, let resultIndex { palette.selection = resultIndex }
+        }
         .overlay {
             if let onActivateFromDragHandle {
                 FileSearchDragHandle(
                     url: result.url,
                     onActivate: onActivateFromDragHandle,
                     onHoverChanged: { inside in
-                        hovered = inside && palette.hoverHighlightArmed
+                        let isArmed = inside && palette.hoverHighlightArmed
+                        hovered = isArmed
+                        if isArmed, dimWhenUnselected, let resultIndex {
+                            palette.selection = resultIndex
+                        }
                     }
                 )
             }

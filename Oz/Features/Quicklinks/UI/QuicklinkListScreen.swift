@@ -17,7 +17,12 @@ struct QuicklinkListScreen: PaletteScreen {
         return store.enabled.filter { $0.name.localizedCaseInsensitiveContains(query) }
     }
 
-    var primaryActionTitle: String { "Open Quicklink" }
+    var primaryActionTitle: String {
+        let quicklinks = rows
+        guard !quicklinks.isEmpty else { return "Open Quicklink" }
+        let index = min(max(vm.selection, 0), quicklinks.count - 1)
+        return "Open \(quicklinks[index].name)"
+    }
 
     private func quicklink(at selection: Int) -> Quicklink? {
         let rows = rows

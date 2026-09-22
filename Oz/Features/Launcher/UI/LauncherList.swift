@@ -3,6 +3,7 @@ import SwiftUI
 struct LauncherList: View {
 
     @Environment(\.metrics) private var metrics
+    @Environment(PaletteState.self) private var palette
     let results: [AppEntry]
     /// The home search's file matches; the dedicated File Search screen remains the full browser.
     let files: [FileSearchResult]
@@ -94,6 +95,11 @@ struct LauncherList: View {
             + fallbacks.entries.enumerated().map { Row.fallback($1, index: $0) }
     }
 
+    /// Headers are presentation only; scrolling is unnecessary for a single selectable item.
+    private var selectableRecordCount: Int {
+        results.count + files.count + (card == nil ? 0 : 1) + (fallbacks?.entries.count ?? 0)
+    }
+
     /// Files follow launcher entries as a distinct section, with their shortcut positions continuing
     /// the flat result order rather than restarting at ⌘1.
     private var fileRows: [Row] {
@@ -179,7 +185,8 @@ struct LauncherList: View {
                                     AppRow(
                                         app: app,
                                         selected: app.id == selectedRowID,
-                                        running: runningApps.isRunning(app), resultIndex: resultIndex
+                                        running: runningApps.isRunning(app), resultIndex: resultIndex,
+                                        selectionIndex: resultIndex ?? 0
                                     )
                                     .contentShape(Rectangle())
                                     .onTapGesture { onActivate(app) }
@@ -189,6 +196,7 @@ struct LauncherList: View {
                                     FileSearchRow(
                                         result: result, selected: row.id == selectedRowID,
                                         resultIndex: resultIndex,
+                                        dimWhenUnselected: true,
                                         onActivateFromDragHandle: { onActivateFile(result) }
                                     )
                                     .contentShape(Rectangle())
@@ -197,7 +205,8 @@ struct LauncherList: View {
                                 case .fallback(let app, let index):
                                     AppRow(
                                         app: app, selected: row.id == selectedRowID, running: false,
-                                        resultIndex: nil
+                                        resultIndex: nil,
+                                        selectionIndex: resultOffset + results.count + files.count + index
                                     )
                                     .contentShape(Rectangle())
                                     .onTapGesture { fallbacks?.onActivate(index) }
@@ -207,12 +216,13 @@ struct LauncherList: View {
                             }
                         }
                         .padding(.horizontal, metrics.spacing.md)
-                        .padding(.top, metrics.spacing.xs)
-                        .padding(.bottom, metrics.spacing.md)
+                        .padding(.top, metrics.spacing.xl)
+                        .padding(.bottom, metrics.spacing.xxl)
                         .hideNativeScrollers()
                         .scrollOriginAnchor()
                     }
-                    .edgeDissolve()
+                    .scrollDisabled(selectableRecordCount <= 1)
+                    .launcherEdgeDissolve()
                     .thinScrollbar()
                     // Snap to the origin on the first row so its header shows too.
                     .scrollFollowsSelection(
@@ -247,6 +257,7 @@ private struct AppRow: View {
     let selected: Bool
     let running: Bool
     let resultIndex: Int?
+    let selectionIndex: Int
     /// Observed so a hotkey set/cleared in Settings re-renders the row's keycaps immediately.
     @Environment(HotKeyManager.self) private var hotKeys
     /// Observed for the same reason: an alias edit re-renders the row's badge at once.
@@ -254,12 +265,7 @@ private struct AppRow: View {
     @Environment(PaletteState.self) private var palette
     @State private var hovered = false
 
-    /// Selection wins over hover when a row is both; otherwise hover shows its fainter layer.
-    private var fill: Color {
-        if selected { return Theme.Colors.selection }
-        if hovered { return Theme.Colors.rowHover }
-        return .clear
-    }
+    private var contentOpacity: Double { selected || hovered ? 1 : 0.38 }
 
     /// Keycaps for this entry's hotkey, or `nil` if none is bound.
     private var shortcutCaps: [String]? {
@@ -333,10 +339,85 @@ private struct AppRow: View {
         }
         .padding(.horizontal, metrics.spacing.md)
         .padding(.vertical, metrics.spacing.sm)
-        .background(
-            RoundedRectangle(cornerRadius: metrics.radius.row, style: .continuous)
-                .fill(fill)
-        )
-        .armedHover($hovered)
+        .opacity(contentOpacity)
+        .armedHover($hovered) { palette.selection = selectionIndex }
+    }
+}
+
+private struct LauncherEdgeDissolve: ViewModifier {
+    @Environment(\.metrics) private var metrics
+    @State private var canScroll = false
+    @State private var topDistance: CGFloat = 0
+
+    private struct ScrollState: Equatable {
+        var topDistance: CGFloat
+        var canScroll: Bool
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .onScrollGeometryChange(for: ScrollState.self) { geometry in
+                let visible = geometry.containerSize.height - geometry.contentInsets.top
+                    - geometry.contentInsets.bottom
+                return ScrollState(
+                    topDistance: max(0, geometry.contentOffset.y + geometry.contentInsets.top),
+                    canScroll: geometry.contentSize.height > visible
+                )
+            } action: { _, state in
+                topDistance = state.topDistance
+                canScroll = state.canScroll
+            }
+            .mask {
+                GeometryReader { geometry in
+                    if geometry.size.height == 0 {
+                        Color.black
+                    } else {
+                        let topBand = min(
+                            metrics.size.headerHeight + metrics.size.headerPadding
+                                + metrics.scaled(32),
+                            geometry.size.height * 0.32
+                        )
+                        let topMidpoint = topBand / 2 / geometry.size.height
+                        let topEnd = topBand / geometry.size.height
+                        let buffer = metrics.spacing.xl
+                        let fadeStrength = canScroll
+                            ? min(max((topDistance - buffer) / metrics.scaled(32), 0), 1) * 0.7
+                            : 0
+                        if fadeStrength == 0 {
+                            LinearGradient(
+                                colors: [.black, .black],
+                                startPoint: .top, endPoint: .bottom
+                            )
+                        } else {
+                            let topAlpha = 1 - 0.85 * fadeStrength
+                            let bottomAlpha = 1 - 0.75 * fadeStrength
+                            let bottomBand = min(
+                                metrics.size.bottomBarHeight + metrics.scaled(28),
+                                geometry.size.height * 0.32
+                            )
+                            let bottomStart = 1 - bottomBand / geometry.size.height
+                            let bottomMidpoint = 1 - bottomBand / 2 / geometry.size.height
+                            LinearGradient(
+                                stops: [
+                                    .init(color: .black.opacity(0), location: 0),
+                                    .init(color: .black.opacity(topAlpha), location: topMidpoint),
+                                    .init(color: .black, location: topEnd),
+                                    .init(color: .black, location: bottomStart),
+                                    .init(color: .black.opacity(bottomAlpha), location: bottomMidpoint),
+                                    .init(color: .black.opacity(0), location: 1)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        }
+                    }
+                }
+            }
+    }
+}
+
+extension View {
+    fileprivate func launcherEdgeDissolve() -> some View {
+        modifier(LauncherEdgeDissolve())
     }
 }

@@ -36,6 +36,13 @@ struct LauncherScreen: PaletteScreen {
     private let fallbacks: [(fallback: Fallback, entry: AppEntry)]
     /// Resolved in `init`: the palette indexes this several times per event, so it can't recompute.
     let rows: [Row]
+    /// The calculator card occupies five normal row-heights in the launcher panel.
+    var viewportRowCount: Int {
+        guard rows.first.map({ if case .calc = $0 { true } else { false } }) == true else {
+            return rows.count
+        }
+        return rows.count - 1 + Theme.Size.launcherCalculatorCardRows
+    }
     /// Every home section is a shortlist; the dedicated search screens remain the full browsers.
     private static let sectionLimit = 5
 
@@ -167,9 +174,12 @@ struct LauncherScreen: PaletteScreen {
         case .color: return "Copy Color"
         case .meeting(let meeting):
             return meeting.link == nil ? "Open in Calendar" : "Join Meeting"
-        case .entry(let app): return app.kind.descriptor.openVerb
+        case .entry(let app):
+            return app.kind == .quicklink ? "Open \(app.name)" : app.kind.descriptor.openVerb
         case .file(let result): return result.isDirectory ? "Open Folder" : "Open File"
-        case .fallback(let fallback, _): return fallback.openVerb
+        case .fallback(let fallback, let app):
+            if case .quicklink = fallback { return "Open \(app.name)" }
+            return fallback.openVerb
         case nil: return "Open Application"
         }
     }

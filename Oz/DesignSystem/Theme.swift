@@ -65,6 +65,8 @@ enum Theme {
         static let launcherVisibleRows = 9
         /// Maximum launcher height: nine rows plus the header, footer and section breathing room.
         static let launcherPanelHeight: CGFloat = 466
+        /// A calculator card is taller than a standard result, so size its viewport as five rows.
+        static let launcherCalculatorCardRows = 5
         /// Opening size on a first run and the floor: below it the title bar's own parts collide.
         static let noteWindow = CGSize(width: 440, height: 180)
         static let noteEditorInset: CGFloat = 16
