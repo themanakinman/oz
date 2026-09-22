@@ -26,7 +26,7 @@ struct CompactFavoritesRow: View {
                         .foregroundStyle(Theme.Colors.textSecondary)
                         .frame(width: metrics.size.rowIcon, height: metrics.size.rowIcon)
                         .background(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            RoundedRectangle(cornerRadius: metrics.radius.custom(6), style: .continuous)
                                 .fill(Theme.Colors.controlSurface)
                                 .padding(metrics.spacing.xxs)
                         )

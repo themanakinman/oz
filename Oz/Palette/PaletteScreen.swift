@@ -84,7 +84,7 @@ typealias MenuPanelClipPath =
             clipPath: { bounds, metrics, corner in
                 PopoverMenu.SurfaceShape(
                     attachment: corner.popoverAttachment, radius: metrics.radius.menuPanel,
-                    attachedRadius: metrics.size.menuButton / 2
+                    attachedRadius: metrics.radius.menuAttachment
                 ).path(in: bounds).cgPath
             },
             motion: .palette)

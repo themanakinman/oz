@@ -134,7 +134,7 @@ struct ExtensionCommandScreen: PaletteScreen {
                 UnevenRoundedRectangle(
                     topLeadingRadius: metrics.radius.menuPanel,
                     bottomLeadingRadius: metrics.radius.menuPanel,
-                    bottomTrailingRadius: metrics.size.menuButton / 2,
+                    bottomTrailingRadius: metrics.radius.menuAttachment,
                     topTrailingRadius: metrics.radius.menuPanel,
                     style: .continuous
                 ).path(in: bounds).cgPath

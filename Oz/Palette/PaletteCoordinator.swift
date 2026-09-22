@@ -137,7 +137,7 @@ final class PaletteCoordinator {
     }
 
     /// Resize the panel to the current collapsed state, when it flips while open.
-    func syncPaletteSize(launcherRowCount: Int? = nil) {
+    func syncPaletteSize(launcherRowCount: CGFloat? = nil) {
         if let launcherRowCount {
             windowController.setLauncherRowCount(launcherRowCount)
         }

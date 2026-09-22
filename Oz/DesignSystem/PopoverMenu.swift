@@ -122,7 +122,7 @@ struct PopoverMenu: View {
     var body: some View {
         let shape = SurfaceShape(
             attachment: attachment, radius: metrics.radius.menuPanel,
-            attachedRadius: metrics.size.menuButton / 2)
+            attachedRadius: metrics.radius.menuAttachment)
         surfaceContent
             .frame(width: width ?? metrics.size.actionMenuWidth)
             .glassEffect(.regular, in: shape)
@@ -385,7 +385,7 @@ private struct PopoverMenuRow: View {
                 if let shortcut = item.shortcut {
                     HStack(spacing: metrics.spacing.xxs) {
                         ForEach(Array(shortcut.enumerated()), id: \.offset) { _, glyph in
-                            KeyCapChip(text: String(glyph), style: .outline)
+                            KeyCapChip(text: String(glyph), style: .plain)
                         }
                     }
                 }

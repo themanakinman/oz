@@ -190,7 +190,9 @@ private struct ComposerChip: View {
         .foregroundStyle(Theme.Colors.textSecondary)
         .padding(.horizontal, metrics.spacing.sm)
         .padding(.vertical, metrics.spacing.xxs)
-        .background(Capsule().fill(Theme.Colors.controlSurface))
+        .background(
+            RoundedRectangle(cornerRadius: metrics.radius.attachmentChip, style: .continuous)
+                .fill(Theme.Colors.controlSurface))
     }
 }
 

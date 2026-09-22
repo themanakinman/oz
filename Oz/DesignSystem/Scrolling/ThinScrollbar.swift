@@ -3,6 +3,7 @@ import SwiftUI
 
 /// A thin auto-hiding SwiftUI overlay scrollbar (hairline thumb while scrolling plus a hover-reveal rail), with all pointer handling isolated in the AppKit `ScrollbarInteraction` view to sidestep SwiftUI/AppKit event-routing gaps.
 struct ThinScrollbar: ViewModifier {
+    @Environment(\.metrics) private var interfaceMetrics
     private struct Metrics: Equatable {
         /// Raw `contentOffset.y`; with `safeAreaInset` bars it rests at `-insetTop`, so normalize by `insetTop` before mapping to a track fraction.
         var offset: CGFloat = 0
@@ -77,14 +78,14 @@ struct ThinScrollbar: ViewModifier {
         if metrics.scrollable {
             ZStack(alignment: .top) {
                 // Rail: a faint full-height track, present only while hovering/dragging.
-                Capsule()
+                RoundedRectangle(cornerRadius: interfaceMetrics.radius.row, style: .continuous)
                     .fill(Color.primary.opacity(0.10))
                     .frame(width: expandedWidth, height: track)
                     .offset(y: inset)
                     .opacity(expanded ? 1 : 0)
 
                 // Thumb: proportional knob, thin at rest and fatter when expanded.
-                Capsule()
+                RoundedRectangle(cornerRadius: interfaceMetrics.radius.row, style: .continuous)
                     .fill(Color.primary.opacity(isDragging ? 0.5 : (expanded ? 0.42 : 0.30)))
                     .frame(width: expanded ? expandedWidth : thinWidth, height: thumbHeight)
                     .frame(width: expandedWidth)

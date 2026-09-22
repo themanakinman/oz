@@ -99,8 +99,13 @@ private struct ResumeFollowingButton: View {
                 .foregroundStyle(Theme.Colors.textSecondary)
                 .padding(.horizontal, metrics.spacing.lg)
                 .padding(.vertical, metrics.spacing.sm)
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay(Capsule().strokeBorder(Theme.Colors.border))
+                .background(
+                    .ultraThinMaterial,
+                    in: RoundedRectangle(cornerRadius: metrics.radius.barControl, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: metrics.radius.barControl, style: .continuous)
+                        .strokeBorder(Theme.Colors.border))
         }
         .buttonStyle(.plain)
     }
@@ -240,7 +245,10 @@ private struct ChatDocumentChip: View {
         .foregroundStyle(Theme.Colors.textSecondary)
         .padding(.horizontal, metrics.spacing.sm)
         .padding(.vertical, metrics.spacing.xxs)
-        .background(Capsule().fill(Theme.Colors.controlSurface))
+        .background(
+            RoundedRectangle(cornerRadius: metrics.radius.attachmentChip, style: .continuous)
+                .fill(Theme.Colors.controlSurface)
+        )
         .accessibilityLabel("Attached file \(document.name)")
     }
 }

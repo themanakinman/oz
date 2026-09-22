@@ -60,7 +60,7 @@ private struct TooltipModifier: ViewModifier {
                 .padding(.horizontal, metrics.spacing.xs)
                 .frame(minHeight: metrics.size.keyCap)
         case .keyCap(let cap):
-            KeyCapChip(text: cap, style: .outline)
+            KeyCapChip(text: cap, style: .plain)
         }
     }
 }

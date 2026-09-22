@@ -23,6 +23,9 @@ final class PalettePanel: NSPanel {
     weak var paletteState: PaletteState? {
         didSet {
             paletteState?.onMenuOpenChanged = { [weak self] open in self?.setSearchCaretHidden(open) }
+            paletteState?.onSearchFieldFrameChanged = { [weak self] in
+                self?.scheduleSearchCaretPositionUpdate()
+            }
         }
     }
 
@@ -51,6 +54,8 @@ final class PalettePanel: NSPanel {
 
     /// Mirrors the field editor's marked text. docs/features/palette.md#ime-composition
     private var compositionObserver: NotificationToken?
+    private var caretTextObserver: NotificationToken?
+    private var searchCaretHidden = false
 
     override func makeFirstResponder(_ responder: NSResponder?) -> Bool {
         // A transport's button is a first responder like any other; the search field outranks it.
@@ -65,19 +70,33 @@ final class PalettePanel: NSPanel {
     func trackComposition() {
         guard let editor = fieldEditor else {
             compositionObserver = nil
+            caretTextObserver = nil
             paletteState?.isComposing = false
+            paletteState?.noteSearchCaretPosition(nil)
             return
         }
         paletteState?.isComposing = editor.hasMarkedText()
         let center = NotificationCenter.default
-        let token = center.addObserver(
+        let selectionToken = center.addObserver(
             forName: NSTextView.didChangeSelectionNotification, object: editor, queue: .main
         ) { [weak self, weak editor] _ in
             MainActor.assumeIsolated {
-                self?.paletteState?.isComposing = editor?.hasMarkedText() ?? false
+                guard let self, let editor else { return }
+                self.paletteState?.isComposing = editor.hasMarkedText()
+                self.scheduleSearchCaretPositionUpdate(from: editor)
             }
         }
-        compositionObserver = NotificationToken(token, center: center)
+        compositionObserver = NotificationToken(selectionToken, center: center)
+        let textToken = center.addObserver(
+            forName: NSText.didChangeNotification, object: editor, queue: .main
+        ) { [weak self, weak editor] _ in
+            MainActor.assumeIsolated {
+                guard let self, let editor else { return }
+                self.scheduleSearchCaretPositionUpdate(from: editor)
+            }
+        }
+        caretTextObserver = NotificationToken(textToken, center: center)
+        scheduleSearchCaretPositionUpdate(from: editor)
     }
 
     /// Keys driving an open menu; they reach `onKeyPress` even while editing is frozen.
@@ -117,10 +136,72 @@ final class PalettePanel: NSPanel {
 
     /// Caret hiding on SwiftUI's own field editor. docs/features/palette.md#menu-open-input-freeze
     private func setSearchCaretHidden(_ hidden: Bool) {
+        searchCaretHidden = hidden
         guard let editor = fieldEditor else { return }
-        editor.insertionPointColor = hidden ? .clear : NSColor(Theme.Colors.textPrimary)
         // Force a redraw so the caret flips at once rather than waiting out the blink timer.
         editor.updateInsertionPointStateAndRestartTimer(!hidden)
+        scheduleSearchCaretPositionUpdate(from: editor)
+    }
+
+    /// Re-read after AppKit lays out the edit, then animate the SwiftUI caret to its insertion point.
+    private func scheduleSearchCaretPositionUpdate(from source: NSTextView? = nil) {
+        guard let editor = source ?? fieldEditor else { return }
+        DispatchQueue.main.async { [weak self, weak editor] in
+            guard let self, let editor, self.fieldEditor === editor else { return }
+            self.updateSearchCaretPosition(from: editor)
+        }
+    }
+
+    private func updateSearchCaretPosition(from editor: NSTextView) {
+        guard let state = paletteState,
+            let window = editor.window, let contentView = window.contentView
+        else {
+            paletteState?.noteSearchCaretPosition(nil)
+            editor.insertionPointColor = NSColor(Theme.Colors.textPrimary)
+            return
+        }
+        let fieldFrame = state.searchFieldFrame
+        guard !fieldFrame.isEmpty, !editor.hasMarkedText() else {
+            state.noteSearchCaretPosition(nil)
+            editor.insertionPointColor = NSColor(Theme.Colors.textPrimary)
+            return
+        }
+
+        let textLength = (editor.string as NSString).length
+        let selection = editor.selectedRange()
+        guard selection.length == 0 else {
+            state.noteSearchCaretPosition(nil)
+            editor.insertionPointColor = NSColor(Theme.Colors.textPrimary)
+            return
+        }
+        let location = min(selection.location, textLength)
+        var actualRange = NSRange()
+        let screenRect = editor.firstRect(
+            forCharacterRange: NSRange(location: location, length: 0), actualRange: &actualRange)
+        guard !screenRect.isEmpty else { return }
+
+        let windowPoint = window.convertPoint(fromScreen: screenRect.origin)
+        let contentPoint = contentView.convert(windowPoint, from: nil)
+        let caretRect = CGRect(
+            x: contentPoint.x,
+            y: contentView.bounds.maxY - contentPoint.y - screenRect.height,
+            width: max(screenRect.width, 1),
+            height: max(screenRect.height, 1))
+        let fieldHitArea = fieldFrame.insetBy(dx: -3, dy: -3)
+        guard fieldHitArea.contains(CGPoint(x: caretRect.midX, y: caretRect.midY)) else {
+            state.noteSearchCaretPosition(nil)
+            editor.insertionPointColor = NSColor(Theme.Colors.textPrimary)
+            return
+        }
+
+        state.noteSearchCaretPosition(
+            CGRect(
+                x: caretRect.minX - fieldFrame.minX,
+                y: caretRect.minY - fieldFrame.minY,
+                width: caretRect.width,
+                height: caretRect.height))
+        editor.insertionPointColor = .clear
+        editor.updateInsertionPointStateAndRestartTimer(!searchCaretHidden)
     }
 
     /// Every event either mechanism sets a cursor on, so neither gets the last word.

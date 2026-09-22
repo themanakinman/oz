@@ -93,7 +93,7 @@ enum Theme {
         /// Fixed slot for the header glyph, so the field starts at one x in every mode.
         static let headerIconSlot: CGFloat = 22
         /// Room above the search row, constant so typing never shifts the bar.
-        static let headerPadding: CGFloat = 10
+        static let headerPadding: CGFloat = 7
         /// Collapsed compact bar: the search row centered in symmetric `headerPadding` slack.
         static let compactHeight: CGFloat = headerHeight + headerPadding * 2
         /// How near the default placement a drag has to land before it snaps home.
@@ -309,7 +309,7 @@ enum Theme {
     /// System text styles (not hardcoded sizes) so the UI honors Dynamic Type.
     enum Typography {
         /// One size, two frameworks: `TextTrailingDragHandle` measures what the field renders.
-        static let searchFieldSize: CGFloat = 20
+        static let searchFieldSize: CGFloat = 24
         static let searchField = Font.system(size: searchFieldSize, weight: .regular)
         /// `NSFont` is not `Sendable`, hence the isolation; every reader is a view anyway.
         @MainActor static let searchFieldNSFont = NSFont.systemFont(

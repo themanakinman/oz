@@ -37,11 +37,11 @@ struct LauncherScreen: PaletteScreen {
     /// Resolved in `init`: the palette indexes this several times per event, so it can't recompute.
     let rows: [Row]
     /// The calculator card occupies five normal row-heights in the launcher panel.
-    var viewportRowCount: Int {
-        guard rows.first.map({ if case .calc = $0 { true } else { false } }) == true else {
-            return rows.count
-        }
-        return rows.count - 1 + Theme.Size.launcherCalculatorCardRows
+    var viewportRowCount: CGFloat {
+        let contentRows =
+            rows.first.map { if case .calc = $0 { true } else { false } } == true
+            ? CGFloat(rows.count - 1 + Theme.Size.launcherCalculatorCardRows) : CGFloat(rows.count)
+        return contentRows + (fallbacks.isEmpty ? 0 : 0.5)
     }
     /// Every home section is a shortlist; the dedicated search screens remain the full browsers.
     private static let sectionLimit = 5

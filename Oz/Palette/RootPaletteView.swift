@@ -47,10 +47,11 @@ struct RootPaletteView: View {
     private var isCollapsed: Bool { core.paletteCoordinator.paletteIsCollapsed }
 
     /// The AppKit panel only needs the launcher's current selectable rows, capped at its viewport.
-    private var launcherRowCountForSizing: Int {
-        guard vm.mode == .launcher else { return Theme.Size.launcherVisibleRows }
-        let rowCount = (screen as? LauncherScreen)?.viewportRowCount ?? screen.rows.count
-        return min(rowCount, Theme.Size.launcherVisibleRows)
+    private var launcherRowCountForSizing: CGFloat {
+        guard vm.mode == .launcher else { return CGFloat(Theme.Size.launcherVisibleRows) }
+        let launcher = screen as? LauncherScreen
+        let rowCount = launcher?.viewportRowCount ?? CGFloat(screen.rows.count)
+        return min(rowCount, CGFloat(Theme.Size.launcherVisibleRows))
     }
 
     /// The current mode's screen: its rows are the visible order the flat selection indexes.
@@ -657,15 +658,9 @@ struct RootPaletteView: View {
         HStack(alignment: .center, spacing: 0) {
             // Matches the list rows and section headers' own indent below.
             headerGutter(width: metrics.spacing.md * 2)
-            // Every sub-screen leaves the same way, so the slot reads the same on all of them.
+            // Sub-screens leave through their back button; the launcher starts directly at the field.
             if vm.mode != .launcher {
                 HeaderBackButton(help: backHelp, action: goBack)
-            } else {
-                Image(systemName: vm.mode.systemImage)
-                    .font(metrics.typography.headerIcon)
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.secondary)
-                    .frame(width: metrics.size.headerIconSlot)
             }
             headerGutter(width: metrics.spacing.md)
             // One structural position: a field inside a branch loses first responder when it flips.
@@ -766,13 +761,13 @@ struct RootPaletteView: View {
     private var aiChatTabHint: some View {
         BarButton(chrome: .rounded, action: cycleMode) {
             HStack(spacing: metrics.spacing.sm) {
-                Text("AI Chat")
+                Text("Ask AI")
                     .font(metrics.typography.bar)
                     .foregroundStyle(Theme.Colors.textSecondary)
-                KeyCapChip(text: "⇥", style: .outline)
+                KeyCapChip(text: "⇥", style: .plain)
             }
         }
-        .help("Ask AI Chat what you typed  ⇥")
+        .help("Ask AI what you typed  ⇥")
     }
 
     /// Resolved through `PaletteTabAction`, so the hint cannot promise the wrong destination.
@@ -862,6 +857,14 @@ struct RootPaletteView: View {
                         onClick: { searchFocused = true })
                 }
             }
+            .overlay(alignment: .topLeading) {
+                if !hidesSearchField, !vm.menuOpen, !vm.isComposing,
+                    !vm.searchCaretFrame.isEmpty
+                {
+                    SmoothPaletteCaret(
+                        frame: vm.searchCaretFrame, typing: vm.searchCaretTyping)
+                }
+            }
             // The panel resolves the pointer against this rather than hit-testing for the field.
             .onGeometryChange(for: CGRect.self) {
                 $0.frame(in: .global)
@@ -912,11 +915,11 @@ struct RootPaletteView: View {
                         .foregroundStyle(pillTint)
                     if formPrimaryShortcut {
                         HStack(spacing: metrics.spacing.xxs) {
-                            KeyCapChip(text: "⌘", style: .outline)
-                            KeyCapChip(text: "↵", style: .outline)
+                            KeyCapChip(text: "⌘", style: .plain)
+                            KeyCapChip(text: "↵", style: .plain)
                         }
                     } else {
-                        KeyCapChip(text: "↵", style: .outline)
+                        KeyCapChip(text: "↵", style: .plain)
                     }
                 }
             }
@@ -927,15 +930,15 @@ struct RootPaletteView: View {
                             .font(metrics.typography.bar)
                             .foregroundStyle(Theme.Colors.textSecondary)
                         HStack(spacing: metrics.spacing.xxs) {
-                            KeyCapChip(text: "⌘", style: .outline)
-                            KeyCapChip(text: "K", style: .outline)
+                            KeyCapChip(text: "⌘", style: .plain)
+                            KeyCapChip(text: "K", style: .plain)
                         }
                     }
                 }
             }
         }
         .padding(metrics.spacing.xs)
-        .paletteSurface(in: Capsule())
+        .paletteSurface(in: RoundedRectangle(cornerRadius: metrics.radius.barControl))
     }
 
     /// The one path opening the Actions menu, sampling the state its rows depend on.
@@ -1418,17 +1421,20 @@ private struct MenuCircleButton: View {
     var body: some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 3) {
-                Capsule().frame(width: 14, height: 1.5)
-                Capsule().frame(width: 8, height: 1.5)
+                Rectangle().frame(width: 14, height: 1.5)
+                Rectangle().frame(width: 8, height: 1.5)
             }
             .foregroundStyle(Theme.Colors.textSecondary)
             .frame(width: metrics.size.menuButton, height: metrics.size.menuButton)
-            .background(Circle().fill(hovered ? Theme.Colors.rowHover : Color.clear))
-            .contentShape(.circle)
+            .background(
+                RoundedRectangle(cornerRadius: metrics.radius.barControl)
+                    .fill(hovered ? Theme.Colors.rowHover : Color.clear)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: metrics.radius.barControl))
         }
         .buttonStyle(.plain)
         .onHover { hovered = $0 }
-        .paletteSurface(in: Circle())
+        .paletteSurface(in: RoundedRectangle(cornerRadius: metrics.radius.barControl))
     }
 }
 
@@ -1452,5 +1458,38 @@ private struct HeaderBackButton: View {
         .onHover { hovered = $0 }
         .animation(.easeOut(duration: Theme.Duration.hover), value: hovered)
         .help(help)
+    }
+}
+
+/// The native editor publishes its insertion point; this view interpolates it between keystrokes.
+private struct SmoothPaletteCaret: View {
+    let frame: CGRect
+    let typing: Bool
+    @State private var blinkVisible = true
+
+    var body: some View {
+        Rectangle()
+            .fill(Theme.Colors.textPrimary)
+            .frame(width: 1.5, height: max(frame.height, 1))
+            .offset(x: frame.minX, y: frame.minY)
+            .opacity(typing || blinkVisible ? 1 : 0)
+            .animation(
+                .timingCurve(0.16, 1, 0.3, 1, duration: 0.19), value: frame.origin)
+            .allowsHitTesting(false)
+            .task(id: typing) {
+                guard !typing else {
+                    blinkVisible = true
+                    return
+                }
+                blinkVisible = true
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(609))
+                    guard !Task.isCancelled else { return }
+                    blinkVisible = false
+                    try? await Task.sleep(for: .milliseconds(441))
+                    guard !Task.isCancelled else { return }
+                    blinkVisible = true
+                }
+            }
     }
 }

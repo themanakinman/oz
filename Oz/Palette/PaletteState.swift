@@ -73,7 +73,17 @@ final class PaletteState {
     /// Where the pointer stood when the list last moved on its own; movement is measured from here.
     @ObservationIgnored private var hoverAnchor: CGPoint = .zero
     /// A containment test, because hit-testing a rebuilding hierarchy misses the field.
-    @ObservationIgnored var searchFieldFrame: CGRect = .zero
+    @ObservationIgnored var searchFieldFrame: CGRect = .zero {
+        didSet {
+            if oldValue != searchFieldFrame { onSearchFieldFrameChanged?() }
+        }
+    }
+    /// Search caret coordinates relative to the header field, published by its AppKit editor.
+    var searchCaretFrame: CGRect = .zero
+    /// Typing keeps the caret solid; after a pause it resumes the regular blink cycle.
+    private(set) var searchCaretTyping = false
+    @ObservationIgnored var onSearchFieldFrameChanged: (() -> Void)?
+    @ObservationIgnored private var searchCaretTypingTask: Task<Void, Never>?
     /// True while a palette menu is open. See docs/features/palette.md#menu-open-input-freeze.
     @ObservationIgnored var menuOpen = false { didSet { onMenuOpenChanged?(menuOpen) } }
     var menuQuery = ""
@@ -189,6 +199,25 @@ final class PaletteState {
         resultSelectionToken = UUID()
     }
 
+    func noteSearchCaretPosition(_ frame: CGRect?) {
+        guard let frame, !frame.isEmpty else {
+            searchCaretTypingTask?.cancel()
+            searchCaretTypingTask = nil
+            searchCaretTyping = false
+            searchCaretFrame = .zero
+            return
+        }
+        if frame != searchCaretFrame { searchCaretFrame = frame }
+        searchCaretTyping = true
+        searchCaretTypingTask?.cancel()
+        searchCaretTypingTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(650))
+            guard !Task.isCancelled else { return }
+            self?.searchCaretTyping = false
+            self?.searchCaretTypingTask = nil
+        }
+    }
+
     func noteCommandHeld(_ held: Bool) {
         commandHoldTask?.cancel()
         commandHoldTask = nil
@@ -198,7 +227,7 @@ final class PaletteState {
         }
         guard !commandHeld else { return }
         commandHoldTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(400))
+            try? await Task.sleep(for: .milliseconds(160))
             guard !Task.isCancelled else { return }
             self?.commandHeld = true
         }

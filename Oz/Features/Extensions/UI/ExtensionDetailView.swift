@@ -149,7 +149,8 @@ private struct ExtensionTagListView: View {
                 .padding(.horizontal, metrics.spacing.xs)
                 .padding(.vertical, 2)
                 .background(
-                    RoundedRectangle(cornerRadius: 4, style: .continuous).fill(color.opacity(0.16))
+                    RoundedRectangle(cornerRadius: metrics.radius.custom(4), style: .continuous)
+                        .fill(color.opacity(0.16))
                 )
             }
         }

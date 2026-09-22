@@ -36,7 +36,7 @@ struct FileSearchQuickLook: View {
                         Text("Close")
                             .font(metrics.typography.bar)
                             .foregroundStyle(Theme.Colors.textSecondary)
-                        KeyCapChip(text: "esc", style: .outline)
+                        KeyCapChip(text: "esc", style: .plain)
                     }
                 }
             }

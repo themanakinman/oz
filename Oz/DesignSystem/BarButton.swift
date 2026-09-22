@@ -26,7 +26,8 @@ enum BarButtonChrome {
     func shape(_ metrics: InterfaceMetrics) -> AnyShape {
         switch self {
         case .capsule:
-            return AnyShape(Capsule())
+            return metrics.radius.barControl == 0
+                ? AnyShape(Rectangle()) : AnyShape(Capsule())
         case .rounded:
             return AnyShape(
                 RoundedRectangle(cornerRadius: metrics.radius.barControl, style: .continuous))

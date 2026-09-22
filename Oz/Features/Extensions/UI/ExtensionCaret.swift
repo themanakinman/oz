@@ -10,7 +10,7 @@ struct ExtensionCaret: View {
     var body: some View {
         // Driven by the timeline, not a stored timer: a `body` per keystroke would restart one.
         TimelineView(.periodic(from: phase, by: form.caretBlink)) { context in
-            RoundedRectangle(cornerRadius: 0.5, style: .continuous)
+            RoundedRectangle(cornerRadius: metrics.radius.custom(0.5), style: .continuous)
                 .fill(Theme.Colors.textPrimary)
                 .frame(width: form.caretWidth)
                 .frame(height: form.caretHeight)

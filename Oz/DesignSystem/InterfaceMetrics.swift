@@ -5,11 +5,20 @@ struct InterfaceMetrics: Equatable, Sendable {
     static let standard = InterfaceMetrics(scale: 1)
 
     let scale: CGFloat
+    private let radiusOverride: CGFloat?
+
+    init(scale: CGFloat, radiusOverride: CGFloat? = nil) {
+        self.scale = scale
+        self.radiusOverride = radiusOverride
+    }
 
     var spacing: Spacing { Spacing(scale: scale) }
-    var radius: Radius { Radius(scale: scale) }
+    var radius: Radius { Radius(scale: scale, override: radiusOverride) }
     var size: Size { Size(scale: scale) }
     var typography: Typography { Typography(scale: scale) }
+
+    /// Palette surfaces use this copy; standalone windows keep the user's standard radii.
+    func withSquareCorners() -> Self { Self(scale: scale, radiusOverride: 0) }
 
     /// For a tuned length a surface owns itself, where `Theme` states no token for it.
     func scaled(_ value: CGFloat) -> CGFloat { scaledPoints(value, scale) }
@@ -35,22 +44,37 @@ struct InterfaceMetrics: Equatable, Sendable {
 
     struct Radius: Equatable, Sendable {
         let scale: CGFloat
+        fileprivate let override: CGFloat?
 
-        var panel: CGFloat { scaledPoints(Theme.Radius.panel, scale) }
-        var row: CGFloat { scaledPoints(Theme.Radius.row, scale) }
-        var emojiCell: CGFloat { scaledPoints(Theme.Radius.emojiCell, scale) }
-        var menu: CGFloat { scaledPoints(Theme.Radius.menu, scale) }
-        var menuRow: CGFloat { scaledPoints(Theme.Radius.menuRow, scale) }
-        var barControl: CGFloat { scaledPoints(Theme.Radius.barControl, scale) }
-        var menuPanel: CGFloat { scaledPoints(Theme.Radius.menuPanel, scale) }
-        var dialogSymbol: CGFloat { scaledPoints(Theme.Radius.dialogSymbol, scale) }
-        var dialog: CGFloat { scaledPoints(Theme.Radius.dialog, scale) }
-        var thumbnail: CGFloat { scaledPoints(Theme.Radius.thumbnail, scale) }
-        var glyph: CGFloat { scaledPoints(Theme.Radius.glyph, scale) }
-        var attachmentChip: CGFloat { scaledPoints(Theme.Radius.attachmentChip, scale) }
-        var card: CGFloat { scaledPoints(Theme.Radius.card, scale) }
-        var keyCap: CGFloat { scaledPoints(Theme.Radius.keyCap, scale) }
-        var tooltip: CGFloat { scaledPoints(Theme.Radius.tooltip, scale) }
+        fileprivate init(scale: CGFloat, override: CGFloat?) {
+            self.scale = scale
+            self.override = override
+        }
+
+        private func value(_ radius: CGFloat) -> CGFloat {
+            override ?? scaledPoints(radius, scale)
+        }
+
+        /// Preserves a literal radius outside the palette while honoring its scoped override.
+        func custom(_ radius: CGFloat) -> CGFloat { override ?? radius }
+
+        var panel: CGFloat { value(Theme.Radius.panel) }
+        var row: CGFloat { value(Theme.Radius.row) }
+        var emojiCell: CGFloat { value(Theme.Radius.emojiCell) }
+        var menu: CGFloat { value(Theme.Radius.menu) }
+        var menuRow: CGFloat { value(Theme.Radius.menuRow) }
+        var barControl: CGFloat { value(Theme.Radius.barControl) }
+        var menuPanel: CGFloat { value(Theme.Radius.menuPanel) }
+        /// Rounded menu corners where a popover attaches to its invoking control.
+        var menuAttachment: CGFloat { override ?? scaledPoints(Theme.Size.menuButton / 2, scale) }
+        var dialogSymbol: CGFloat { value(Theme.Radius.dialogSymbol) }
+        var dialog: CGFloat { value(Theme.Radius.dialog) }
+        var thumbnail: CGFloat { value(Theme.Radius.thumbnail) }
+        var glyph: CGFloat { value(Theme.Radius.glyph) }
+        var attachmentChip: CGFloat { value(Theme.Radius.attachmentChip) }
+        var card: CGFloat { value(Theme.Radius.card) }
+        var keyCap: CGFloat { value(Theme.Radius.keyCap) }
+        var tooltip: CGFloat { value(Theme.Radius.tooltip) }
     }
 
     struct Size: Equatable, Sendable {

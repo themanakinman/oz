@@ -152,8 +152,10 @@ private struct ClipboardRow: View {
                 Text(shortcut)
                     .font(metrics.typography.rowTrailing)
                     .foregroundStyle(.secondary)
+                    .transition(.opacity)
             }
         }
+        .animation(.easeOut(duration: 0.12), value: palette.commandHeld)
         .padding(.horizontal, metrics.spacing.md)
         .padding(.vertical, metrics.spacing.sm)
         .background(

@@ -158,6 +158,9 @@ struct LauncherList: View {
 
     var body: some View {
         let rows = rows
+        let fallbackBuffer =
+            fallbacks == nil
+            ? 0 : (metrics.size.rowIcon + metrics.spacing.sm * 2) / 2
         return Group {
             if results.isEmpty && files.isEmpty && card == nil && fallbacks == nil {
                 EmptyResults(text: "No apps found")
@@ -203,10 +206,12 @@ struct LauncherList: View {
                                     .onRightClick { onFileActions(result) }
                                     .selectionFrame(row.id == selectedRowID)
                                 case .fallback(let app, let index):
+                                    let resultIndex =
+                                        resultOffset + results.count + files.count + index
                                     AppRow(
                                         app: app, selected: row.id == selectedRowID, running: false,
-                                        resultIndex: nil,
-                                        selectionIndex: resultOffset + results.count + files.count + index
+                                        resultIndex: resultIndex,
+                                        selectionIndex: resultIndex
                                     )
                                     .contentShape(Rectangle())
                                     .onTapGesture { fallbacks?.onActivate(index) }
@@ -217,7 +222,7 @@ struct LauncherList: View {
                         }
                         .padding(.horizontal, metrics.spacing.md)
                         .padding(.top, metrics.spacing.xl)
-                        .padding(.bottom, metrics.spacing.xxl)
+                        .padding(.bottom, metrics.spacing.xxl + fallbackBuffer)
                         .hideNativeScrollers()
                         .scrollOriginAnchor()
                     }
@@ -313,7 +318,7 @@ private struct AppRow: View {
             if let caps = shortcutCaps {
                 HStack(spacing: metrics.spacing.xxs) {
                     ForEach(Array(caps.enumerated()), id: \.offset) { _, cap in
-                        KeyCapChip(text: cap, style: .outline)
+                        KeyCapChip(text: cap, style: .plain)
                     }
                 }
             }
@@ -335,8 +340,10 @@ private struct AppRow: View {
                 Text(shortcut)
                     .font(metrics.typography.rowTrailing)
                     .foregroundStyle(.secondary)
+                    .transition(.opacity)
             }
         }
+        .animation(.easeOut(duration: 0.12), value: palette.commandHeld)
         .padding(.horizontal, metrics.spacing.md)
         .padding(.vertical, metrics.spacing.sm)
         .opacity(contentOpacity)
@@ -357,7 +364,8 @@ private struct LauncherEdgeDissolve: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onScrollGeometryChange(for: ScrollState.self) { geometry in
-                let visible = geometry.containerSize.height - geometry.contentInsets.top
+                let visible =
+                    geometry.containerSize.height - geometry.contentInsets.top
                     - geometry.contentInsets.bottom
                 return ScrollState(
                     topDistance: max(0, geometry.contentOffset.y + geometry.contentInsets.top),
@@ -380,7 +388,8 @@ private struct LauncherEdgeDissolve: ViewModifier {
                         let topMidpoint = topBand / 2 / geometry.size.height
                         let topEnd = topBand / geometry.size.height
                         let buffer = metrics.spacing.xl
-                        let fadeStrength = canScroll
+                        let fadeStrength =
+                            canScroll
                             ? min(max((topDistance - buffer) / metrics.scaled(32), 0), 1) * 0.7
                             : 0
                         if fadeStrength == 0 {

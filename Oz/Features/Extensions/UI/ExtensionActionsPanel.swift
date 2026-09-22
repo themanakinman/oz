@@ -62,7 +62,7 @@ struct ExtensionActionsPanel: View {
         let shape = UnevenRoundedRectangle(
             topLeadingRadius: metrics.radius.menuPanel,
             bottomLeadingRadius: metrics.radius.menuPanel,
-            bottomTrailingRadius: metrics.size.menuButton / 2,
+            bottomTrailingRadius: metrics.radius.menuAttachment,
             topTrailingRadius: metrics.radius.menuPanel,
             style: .continuous)
         return VStack(spacing: 0) {
@@ -195,7 +195,7 @@ private struct ExtensionActionRow: View {
                 if let shortcut = item.shortcut {
                     HStack(spacing: metrics.spacing.xxs) {
                         ForEach(Array(shortcut.enumerated()), id: \.offset) { _, glyph in
-                            KeyCapChip(text: String(glyph), style: .outline)
+                            KeyCapChip(text: String(glyph), style: .plain)
                         }
                     }
                 }

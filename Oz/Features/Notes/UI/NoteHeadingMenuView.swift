@@ -65,7 +65,7 @@ private struct NoteHeadingMenuRow: View {
                 Spacer(minLength: Theme.Spacing.sm)
                 HStack(spacing: Theme.Spacing.xxs) {
                     ForEach(Array(shortcut.enumerated()), id: \.offset) { _, glyph in
-                        KeyCapChip(text: String(glyph), style: .outline)
+                        KeyCapChip(text: String(glyph), style: .plain)
                     }
                 }
             }

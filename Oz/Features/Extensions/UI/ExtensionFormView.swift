@@ -378,10 +378,10 @@ private struct ExtensionCheckbox: View {
 
     /// Drawn, not an SF Symbol pair: those differ in weight and jitter as they tick.
     private var box: some View {
-        RoundedRectangle(cornerRadius: 4, style: .continuous)
+        RoundedRectangle(cornerRadius: metrics.radius.custom(4), style: .continuous)
             .fill(isOn ? Color.accentColor : ExtensionColors.fieldFill)
             .overlay(
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                RoundedRectangle(cornerRadius: metrics.radius.custom(4), style: .continuous)
                     .strokeBorder(borderColor, lineWidth: 1)
             )
             .overlay {

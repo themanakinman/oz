@@ -122,7 +122,7 @@ private struct QuicklinkRow: View {
             if let keycaps = hotKeys.binding(for: .quicklink(id: quicklink.id))?.keycaps {
                 HStack(spacing: metrics.spacing.xxs) {
                     ForEach(Array(keycaps.enumerated()), id: \.offset) { _, cap in
-                        KeyCapChip(text: cap, style: .outline)
+                        KeyCapChip(text: cap, style: .plain)
                     }
                 }
             }

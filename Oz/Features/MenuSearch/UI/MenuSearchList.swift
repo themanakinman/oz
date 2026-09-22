@@ -132,7 +132,7 @@ private struct MenuSearchRow: View {
             if !caps.isEmpty {
                 HStack(spacing: metrics.spacing.xxs) {
                     ForEach(caps, id: \.self) { cap in
-                        KeyCapChip(text: cap, style: .outline)
+                        KeyCapChip(text: cap, style: .plain)
                     }
                 }
             }

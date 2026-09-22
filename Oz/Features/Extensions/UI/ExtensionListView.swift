@@ -276,7 +276,7 @@ struct ExtensionAccessoriesView: View {
                 .padding(.horizontal, metrics.spacing.xs)
                 .padding(.vertical, 1)
                 .background(
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    RoundedRectangle(cornerRadius: metrics.radius.custom(4), style: .continuous)
                         .fill(color.opacity(0.16))
                 )
                 .lineLimit(1)
@@ -353,12 +353,16 @@ private struct ExtensionGridCell: View {
             .clipShape(RoundedRectangle(cornerRadius: contentRadius, style: .continuous))
             .frame(width: width, height: height)
             .background(
-                RoundedRectangle(cornerRadius: ExtensionGridLayout.tileRadius, style: .continuous)
+                RoundedRectangle(
+                    cornerRadius: metrics.radius.custom(ExtensionGridLayout.tileRadius),
+                    style: .continuous)
                     .fill(background)
             )
             // A tile filled edge to edge hides that fill, so the ring is what marks the selection.
             .overlay {
-                RoundedRectangle(cornerRadius: ExtensionGridLayout.tileRadius, style: .continuous)
+                RoundedRectangle(
+                    cornerRadius: metrics.radius.custom(ExtensionGridLayout.tileRadius),
+                    style: .continuous)
                     .strokeBorder(Theme.Colors.border, lineWidth: 2)
                     .opacity(selected ? 1 : 0)
             }
@@ -366,7 +370,8 @@ private struct ExtensionGridCell: View {
 
     /// Filling content shares the tile's corner; inset artwork is small enough to need a tighter one.
     private var contentRadius: Double {
-        layout.inset == .zero ? ExtensionGridLayout.tileRadius : metrics.radius.thumbnail
+        layout.inset == .zero
+            ? metrics.radius.custom(ExtensionGridLayout.tileRadius) : metrics.radius.thumbnail
     }
 
     /// `content` is an `ImageLike` or `{value, tooltip}` wrapping one — both `resolve`'s job.

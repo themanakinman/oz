@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// A single keycap chip: `.outline` for hotkey hints on rows, `.filled` for footer shortcuts.
+/// A single keycap: `.plain` for shortcut hints, `.filled` for emphasized key presses.
 struct KeyCapChip: View {
     enum Style {
-        case outline
+        case plain
         case filled
     }
 
@@ -45,12 +45,15 @@ struct KeyCapChip: View {
             .font(scale.font(metrics))
             .foregroundStyle(Theme.Colors.textSecondary)
             .offset(y: text == "↵" ? Self.returnGlyphDrop : 0)
-            .padding(.horizontal, metrics.spacing.xs)
-            .frame(minWidth: scale.side(metrics), minHeight: scale.side(metrics))
+            .padding(.horizontal, style == .plain ? 0 : metrics.spacing.xs)
+            .frame(
+                minWidth: style == .plain ? 0 : scale.side(metrics),
+                minHeight: style == .plain ? 0 : scale.side(metrics)
+            )
             .background {
                 switch style {
                 case .filled: shape.fill(Theme.Colors.controlSurface)
-                case .outline: shape.strokeBorder(Theme.Colors.border, lineWidth: 1)
+                case .plain: Color.clear
                 }
             }
     }

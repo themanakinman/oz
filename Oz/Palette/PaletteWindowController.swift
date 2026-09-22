@@ -13,7 +13,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
     // Reopen beat the timeout, so select the preserved query.
     private var queryWasPreserved = false
     /// The launcher grows only as far as its current selectable rows, up to the nine-row maximum.
-    private var launcherRowCount = Theme.Size.launcherVisibleRows
+    private var launcherRowCount = CGFloat(Theme.Size.launcherVisibleRows)
     /// Resolved once per show; the top edge is the one that must not drift.
     private var anchor: CGPoint?
     /// Live only between mouse-down and mouse-up on a drag handle; nil means a move was ours.
@@ -388,8 +388,8 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
     }
 
     /// Called after SwiftUI rebuilds the launcher rows, including when Spotlight results arrive.
-    func setLauncherRowCount(_ count: Int) {
-        launcherRowCount = min(max(count, 1), Theme.Size.launcherVisibleRows)
+    func setLauncherRowCount(_ count: CGFloat) {
+        launcherRowCount = min(max(count, 1), CGFloat(Theme.Size.launcherVisibleRows))
         guard let panel, !core.paletteCoordinator.paletteIsCollapsed,
             core.palette.mode == .launcher
         else { return }
@@ -412,7 +412,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
             height = size.compactHeight
         } else if core.palette.mode == .launcher {
             let rowHeight = size.rowIcon + metrics.spacing.sm * 2
-            let rowReduction = CGFloat(Theme.Size.launcherVisibleRows - launcherRowCount)
+            let rowReduction = CGFloat(Theme.Size.launcherVisibleRows) - launcherRowCount
             height = size.launcherPanelHeight - rowReduction * rowHeight
         } else {
             height = size.panelHeight
