@@ -188,10 +188,10 @@ struct LauncherList: View {
                                 case .file(let result, let resultIndex):
                                     FileSearchRow(
                                         result: result, selected: row.id == selectedRowID,
-                                        resultIndex: resultIndex
+                                        resultIndex: resultIndex,
+                                        onActivateFromDragHandle: { onActivateFile(result) }
                                     )
                                     .contentShape(Rectangle())
-                                    .onTapGesture { onActivateFile(result) }
                                     .onRightClick { onFileActions(result) }
                                     .selectionFrame(row.id == selectedRowID)
                                 case .fallback(let app, let index):

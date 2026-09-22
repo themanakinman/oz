@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct FileSearchList: View {
@@ -54,14 +55,19 @@ struct FileSearchRow: View {
     let selected: Bool
     /// The root search lends its ⌘1…⌘0 hints; the dedicated screen has none to show.
     var resultIndex: Int? = nil
+    var onActivateFromDragHandle: (() -> Void)?
     @Environment(PaletteState.self) private var palette
     @State private var image: NSImage?
     @State private var hovered = false
 
-    init(result: FileSearchResult, selected: Bool, resultIndex: Int? = nil) {
+    init(
+        result: FileSearchResult, selected: Bool, resultIndex: Int? = nil,
+        onActivateFromDragHandle: (() -> Void)? = nil
+    ) {
         self.result = result
         self.selected = selected
         self.resultIndex = resultIndex
+        self.onActivateFromDragHandle = onActivateFromDragHandle
         _image = State(initialValue: IconCache.cachedFitted(forFile: result.id))
     }
 
@@ -115,6 +121,17 @@ struct FileSearchRow: View {
                 .fill(fill)
         )
         .armedHover($hovered)
+        .overlay {
+            if let onActivateFromDragHandle {
+                FileSearchDragHandle(
+                    url: result.url,
+                    onActivate: onActivateFromDragHandle,
+                    onHoverChanged: { inside in
+                        hovered = inside && palette.hoverHighlightArmed
+                    }
+                )
+            }
+        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(result.name)
         .accessibilityValue(result.parentPath)
@@ -126,5 +143,125 @@ struct FileSearchRow: View {
             }
             image = await IconCache.loadFittedAsync(forFile: result.id)
         }
+    }
+}
+
+struct FileSearchDragHandle: NSViewRepresentable {
+    let url: URL
+    let onActivate: () -> Void
+    let onHoverChanged: (Bool) -> Void
+
+    func makeNSView(context: Context) -> NSView { FileSearchDragView() }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        (nsView as? FileSearchDragView)?.bind(
+            url: url, onActivate: onActivate, onHoverChanged: onHoverChanged)
+    }
+}
+
+private final class FileSearchDragView: NSView, NSDraggingSource {
+    private static let threshold: CGFloat = 4
+    private static let previewSize = NSSize(width: 48, height: 48)
+
+    private var url: URL?
+    private var onActivate: (() -> Void)?
+    private var onHoverChanged: ((Bool) -> Void)?
+
+    func bind(
+        url: URL, onActivate: @escaping () -> Void, onHoverChanged: @escaping (Bool) -> Void
+    ) {
+        self.url = url
+        self.onActivate = onActivate
+        self.onHoverChanged = onHoverChanged
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(
+            NSTrackingArea(
+                rect: .zero,
+                options: [.mouseEnteredAndExited, .mouseMoved, .activeInKeyWindow, .inVisibleRect],
+                owner: self,
+                userInfo: nil
+            )
+        )
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        onHoverChanged?(true)
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        onHoverChanged?(true)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        onHoverChanged?(false)
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        switch NSApp.currentEvent?.type {
+        case .rightMouseDown, .rightMouseUp, .rightMouseDragged: return nil
+        default: return super.hitTest(point)
+        }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let window else { return }
+        if event.clickCount == 2 {
+            onActivate?()
+            return
+        }
+
+        let start = NSEvent.mouseLocation
+        var passedThreshold = false
+        window.trackEvents(
+            matching: [.leftMouseDragged, .leftMouseUp], timeout: NSEvent.foreverDuration,
+            mode: .eventTracking
+        ) { tracked, stop in
+            guard let tracked, tracked.type != .leftMouseUp else {
+                stop.pointee = true
+                return
+            }
+            let mouse = NSEvent.mouseLocation
+            guard hypot(mouse.x - start.x, mouse.y - start.y) > Self.threshold else { return }
+            passedThreshold = true
+            stop.pointee = true
+        }
+
+        guard passedThreshold, let url else {
+            onActivate?()
+            return
+        }
+        beginDrag(url, with: event)
+    }
+
+    private func beginDrag(_ url: URL, with event: NSEvent) {
+        let icon =
+            IconCache.cachedFitted(forFile: url.path)
+            ?? NSWorkspace.shared.icon(forFile: url.path)
+        let preview = NSImage(size: Self.previewSize, flipped: false) { rect in
+            icon.draw(in: rect)
+            return true
+        }
+        let item = NSDraggingItem(pasteboardWriter: url as NSURL)
+        let origin = convert(event.locationInWindow, from: nil)
+        item.setDraggingFrame(
+            NSRect(
+                x: origin.x - preview.size.width / 2,
+                y: origin.y - preview.size.height / 2,
+                width: preview.size.width,
+                height: preview.size.height
+            ), contents: preview
+        )
+        let session = beginDraggingSession(with: [item], event: event, source: self)
+        session.animatesToStartingPositionsOnCancelOrFail = true
+    }
+
+    func draggingSession(
+        _ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext
+    ) -> NSDragOperation {
+        .copy
     }
 }
