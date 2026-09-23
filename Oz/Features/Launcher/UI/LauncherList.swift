@@ -205,8 +205,10 @@ struct LauncherList: View {
                                         result: result, selected: row.id == selectedRowID,
                                         resultIndex: resultIndex,
                                         dimWhenUnselected: true,
-                                        onActivateFromDragHandle: {
+                                        onSelectFromDragHandle: {
                                             if let resultIndex { palette.selection = resultIndex }
+                                        },
+                                        onActivateFromDragHandle: {
                                             onActivateFile(result)
                                         }
                                     )

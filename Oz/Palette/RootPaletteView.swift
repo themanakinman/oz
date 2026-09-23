@@ -850,6 +850,14 @@ struct RootPaletteView: View {
             .font(metrics.typography.searchField)
             .tint(Theme.Colors.textPrimary)
             .focused($searchFocused)
+            .onKeyPress(.space) {
+                guard searchFocused, vm.mode == .launcher, vm.query.isEmpty,
+                    settings.fileSearchEnabled, !vm.menuOpen, !vm.isEditingField,
+                    !vm.isComposing
+                else { return .ignored }
+                core.fileSearchCoordinator.show()
+                return .handled
+            }
             // Fills the row's height, so there's no gap above it for topDragStrip to meet.
             .frame(maxHeight: .infinity)
             .background(alignment: .leading) {

@@ -4,7 +4,8 @@ Search Files is the full palette screen for opening files and folders from the f
 configures. Its first five relevant results also appear in the launcher's **Files & Folders** section,
 using the same filename search, scopes and ranking. It searches through Spotlight, adds no private
 index or launch work, and the dedicated screen remains available from the built-in Search Files
-launcher command or its global shortcut after the feature is enabled in Settings.
+launcher command, its global shortcut, or a leading space in the empty launcher after the feature is
+enabled in Settings.
 
 ## Invariants
 
@@ -158,10 +159,9 @@ draws. The list uses the shared Results header, row metrics, edge dissolve, thin
 intent; its header reads **Recently Used** on the blank screen and **Results** under a query. A row shows
 a fitted native file icon and the full filename — a folder prefixed by its parent's name, dimmed, since
 half the folder hits on a developer machine are some `src` or `Oz`. The path itself is the preview's
-`Where` row rather than a second column the narrow list has no width for. A click selects and a double
-click opens, both through `onRowClick`, which answers on the press: `.onTapGesture(count: 2)` makes the
-single tap wait out the system's double-click interval first, and that wait *is* the second a click used
-to take before the preview moved.
+`Where` row rather than a second column the narrow list has no width for. Rows drag their file URLs to
+other applications. A click selects and a double click opens; both answer on the press, so the preview
+moves without waiting out the system's double-click interval.
 
 Fitted row icons use a separate 8 MB transient cache. Leaving the list or hiding the palette purges it
 and invalidates in-flight decodes, so scrolling stays warm within one result set without retaining its

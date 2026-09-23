@@ -24,12 +24,12 @@ struct FileSearchList: View {
                     ForEach(results) { result in
                         FileSearchRow(
                             result: result, selected: result.id == selectedID,
-                            showsPathMetadata: false)
+                            showsPathMetadata: false,
+                            onSelectFromDragHandle: { onSelect(result) },
+                            onActivateFromDragHandle: { onActivate(result) },
+                            singleClickActivates: false)
                             .selectionFrame(result.id == selectedID)
                             .contentShape(Rectangle())
-                            .onRowClick(
-                                select: { onSelect(result) }, activate: { onActivate(result) }
-                            )
                             .onRightClick { onActions(result) }
                     }
                 }
@@ -60,7 +60,9 @@ struct FileSearchRow: View {
     var showsPathMetadata = true
     /// Unselected files dim in every result list, matching the launcher and other palette modes.
     var dimWhenUnselected = true
+    var onSelectFromDragHandle: (() -> Void)?
     var onActivateFromDragHandle: (() -> Void)?
+    var singleClickActivates = true
     @Environment(PaletteState.self) private var palette
     @State private var image: NSImage?
     @State private var hovered = false
@@ -68,14 +70,17 @@ struct FileSearchRow: View {
     init(
         result: FileSearchResult, selected: Bool, resultIndex: Int? = nil,
         showsPathMetadata: Bool = true, dimWhenUnselected: Bool = true,
-        onActivateFromDragHandle: (() -> Void)? = nil
+        onSelectFromDragHandle: (() -> Void)? = nil,
+        onActivateFromDragHandle: (() -> Void)? = nil, singleClickActivates: Bool = true
     ) {
         self.result = result
         self.selected = selected
         self.resultIndex = resultIndex
         self.showsPathMetadata = showsPathMetadata
         self.dimWhenUnselected = dimWhenUnselected
+        self.onSelectFromDragHandle = onSelectFromDragHandle
         self.onActivateFromDragHandle = onActivateFromDragHandle
+        self.singleClickActivates = singleClickActivates
         _image = State(initialValue: IconCache.cachedFitted(forFile: result.id))
     }
 
@@ -142,7 +147,9 @@ struct FileSearchRow: View {
             if let onActivateFromDragHandle {
                 FileSearchDragHandle(
                     url: result.url,
+                    onSelect: { onSelectFromDragHandle?() },
                     onActivate: onActivateFromDragHandle,
+                    singleClickActivates: singleClickActivates,
                     onHoverChanged: { inside in
                         let isArmed = inside && palette.hoverHighlightArmed
                         hovered = isArmed
@@ -166,14 +173,17 @@ struct FileSearchRow: View {
 
 struct FileSearchDragHandle: NSViewRepresentable {
     let url: URL
+    let onSelect: () -> Void
     let onActivate: () -> Void
+    let singleClickActivates: Bool
     let onHoverChanged: (Bool) -> Void
 
     func makeNSView(context: Context) -> NSView { FileSearchDragView() }
 
     func updateNSView(_ nsView: NSView, context: Context) {
         (nsView as? FileSearchDragView)?.bind(
-            url: url, onActivate: onActivate, onHoverChanged: onHoverChanged)
+            url: url, onSelect: onSelect, onActivate: onActivate,
+            singleClickActivates: singleClickActivates, onHoverChanged: onHoverChanged)
     }
 }
 
@@ -182,14 +192,19 @@ private final class FileSearchDragView: NSView, NSDraggingSource {
     private static let previewSize = NSSize(width: 48, height: 48)
 
     private var url: URL?
+    private var onSelect: (() -> Void)?
     private var onActivate: (() -> Void)?
+    private var singleClickActivates = true
     private var onHoverChanged: ((Bool) -> Void)?
 
     func bind(
-        url: URL, onActivate: @escaping () -> Void, onHoverChanged: @escaping (Bool) -> Void
+        url: URL, onSelect: @escaping () -> Void, onActivate: @escaping () -> Void,
+        singleClickActivates: Bool, onHoverChanged: @escaping (Bool) -> Void
     ) {
         self.url = url
+        self.onSelect = onSelect
         self.onActivate = onActivate
+        self.singleClickActivates = singleClickActivates
         self.onHoverChanged = onHoverChanged
     }
 
@@ -227,6 +242,7 @@ private final class FileSearchDragView: NSView, NSDraggingSource {
 
     override func mouseDown(with event: NSEvent) {
         guard let window else { return }
+        onSelect?()
         if event.clickCount == 2 {
             onActivate?()
             return
@@ -248,10 +264,11 @@ private final class FileSearchDragView: NSView, NSDraggingSource {
             stop.pointee = true
         }
 
-        guard passedThreshold, let url else {
-            onActivate?()
+        guard passedThreshold else {
+            if singleClickActivates { onActivate?() }
             return
         }
+        guard let url else { return }
         beginDrag(url, with: event)
     }
 
