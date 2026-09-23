@@ -18,7 +18,7 @@ enum Theme {
         /// Gap under a category header, shared by every palette list's `SectionHeader`.
         static let sectionHeaderBottom: CGFloat = 4
         /// Clearance under the last message, so its actions row belongs to it, not to the footer.
-        static let chatTranscriptBottom: CGFloat = 28
+        static let chatTranscriptBottom: CGFloat = 90
         /// A stream grows the transcript as the reader descends, so an exact-bottom test runs away.
         static let chatFollowTailSlack: CGFloat = 44
         /// Space above every header but the first, reading as the previous section's close.
@@ -311,7 +311,7 @@ enum Theme {
     /// System text styles (not hardcoded sizes) so the UI honors Dynamic Type.
     enum Typography {
         /// One size, two frameworks: `TextTrailingDragHandle` measures what the field renders.
-        static let searchFieldSize: CGFloat = 35
+        static let searchFieldSize: CGFloat = 24
         static let searchField = Font.system(size: searchFieldSize, weight: .regular)
         /// `NSFont` is not `Sendable`, hence the isolation; every reader is a view anyway.
         @MainActor static let searchFieldNSFont = NSFont.systemFont(

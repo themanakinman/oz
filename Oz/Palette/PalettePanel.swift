@@ -39,6 +39,17 @@ final class PalettePanel: NSPanel {
         fieldEditor?.selectAll(nil)
     }
 
+    func resetFieldEditorCursorToBeginning() {
+        guard let editor = fieldEditor else { return }
+        Task { @MainActor [weak self, weak editor] in
+            await Task.yield()
+            guard let self, let editor, self.fieldEditor === editor else { return }
+            let beginning = NSRange(location: 0, length: 0)
+            editor.setSelectedRange(beginning)
+            editor.scrollRangeToVisible(beginning)
+        }
+    }
+
     /// Nil while a selection can still collapse normally, or when the caret is not at an edge.
     private func headerFieldBoundary(for event: NSEvent) -> HeaderFieldBoundary? {
         guard event.modifierFlags.isDisjoint(with: [.command, .option, .control, .shift]),

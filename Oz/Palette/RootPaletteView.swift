@@ -357,10 +357,13 @@ struct RootPaletteView: View {
         refreshActionsMenu()
     }
 
-    /// Split from `body` for the same reason `keyHandlers` is: one chain cannot carry them all.
-    @ViewBuilder
+    /// Split into groups because the complete observer chain exceeds type-checker reach.
     private func stateObservers(_ content: some View) -> some View {
-        emojiObservers(content)
+        layoutObservers(menuObservers(filterObservers(searchObservers(emojiObservers(content)))))
+    }
+
+    private func searchObservers(_ content: some View) -> some View {
+        content
             // Every show bumps focusToken so the search field refocuses.
             .onChange(of: vm.focusToken) {
                 searchFocused = !screen.hidesSearchField
@@ -392,6 +395,10 @@ struct RootPaletteView: View {
                 extensions.dispatch(handler: handler, arguments: [vm.query])
             }
             .modifier(ExtensionSelectionForwarder(screen: extensionScreen, selection: vm.selection))
+    }
+
+    private func filterObservers(_ content: some View) -> some View {
+        content
             // A narrower list means the old index points at a different row, or at none.
             .onChange(of: vm.clipboardFilter) {
                 vm.selection = 0
@@ -437,6 +444,10 @@ struct RootPaletteView: View {
                     Task { await extensions.stop() }
                 }
             }
+    }
+
+    private func menuObservers(_ content: some View) -> some View {
+        content
             // `prepare` may change nothing, so this intent still snaps the scroll to the origin.
             .onChange(of: vm.resetToken) {
                 if menuOpen { closeMenus() }
@@ -470,6 +481,10 @@ struct RootPaletteView: View {
                 core.paletteCoordinator.syncPaletteSize(
                     launcherRowCount: launcherRowCountForSizing)
             }
+    }
+
+    private func layoutObservers(_ content: some View) -> some View {
+        content
             .onChange(of: launcherRowCountForSizing) {
                 guard vm.mode == .launcher else { return }
                 core.paletteCoordinator.syncPaletteSize(
@@ -562,6 +577,7 @@ struct RootPaletteView: View {
                     returnFocusToSearchField()
                 case .clearQuery:
                     vm.query = ""
+                    (hostWindow as? PalettePanel)?.resetFieldEditorCursorToBeginning()
                 case .exitExtensionScreen:
                     core.extensionCoordinator.exitExtensionScreen()
                 case .goBack:
@@ -1467,42 +1483,50 @@ private struct SmoothPaletteCaret: View {
     let typing: Bool
     @State private var blinkVisible = true
 
+    private var glowReach: CGFloat { Theme.Blur.paletteCaretGlow * 2 }
+    private var caretHeight: CGFloat { max(frame.height, 1) }
+
     var body: some View {
-        ZStack {
-            Capsule()
-                .fill(Theme.Colors.paletteCaretGradient)
-                .frame(width: Theme.Size.paletteCaretWidth, height: max(frame.height, 1))
-                .blur(radius: Theme.Blur.paletteCaretGlow)
-                .opacity(Theme.Colors.paletteCaretGlowOpacity)
-            Capsule()
-                .fill(Theme.Colors.textPrimary)
-                .frame(width: Theme.Size.paletteCaretWidth, height: max(frame.height, 1))
-                .overlay(alignment: .center) {
-                    Capsule()
-                        .fill(Theme.Colors.paletteCaretGradient)
-                        .opacity(Theme.Colors.paletteCaretOpacity)
+        Capsule()
+            .fill(Theme.Colors.textPrimary)
+            .frame(width: Theme.Size.paletteCaretWidth, height: caretHeight)
+            .overlay(alignment: .center) {
+                Capsule()
+                    .fill(Theme.Colors.paletteCaretGradient)
+                    .opacity(Theme.Colors.paletteCaretOpacity)
+            }
+            .overlay(alignment: .leading) {
+                Capsule()
+                    .fill(Theme.Colors.paletteCaretGradient)
+                    .frame(width: Theme.Size.paletteCaretWidth, height: caretHeight)
+                    .blur(radius: Theme.Blur.paletteCaretGlow)
+                    .frame(
+                        width: glowReach + Theme.Size.paletteCaretWidth,
+                        height: caretHeight + glowReach * 2,
+                        alignment: .trailing)
+                    .clipped()
+                    .opacity(Theme.Colors.paletteCaretGlowOpacity)
+                    .offset(x: -glowReach)
+            }
+            .offset(x: frame.minX, y: frame.minY)
+            .opacity(typing || blinkVisible ? 1 : 0)
+            .animation(
+                .timingCurve(0.16, 1, 0.3, 1, duration: 0.19), value: frame.origin)
+            .allowsHitTesting(false)
+            .task(id: typing) {
+                guard !typing else {
+                    blinkVisible = true
+                    return
                 }
-        }
-        .frame(width: Theme.Size.paletteCaretWidth, height: max(frame.height, 1))
-        .offset(x: frame.minX, y: frame.minY)
-        .opacity(typing || blinkVisible ? 1 : 0)
-        .animation(
-            .timingCurve(0.16, 1, 0.3, 1, duration: 0.19), value: frame.origin)
-        .allowsHitTesting(false)
-        .task(id: typing) {
-            guard !typing else {
                 blinkVisible = true
-                return
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(609))
+                    guard !Task.isCancelled else { return }
+                    blinkVisible = false
+                    try? await Task.sleep(for: .milliseconds(441))
+                    guard !Task.isCancelled else { return }
+                    blinkVisible = true
+                }
             }
-            blinkVisible = true
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(609))
-                guard !Task.isCancelled else { return }
-                blinkVisible = false
-                try? await Task.sleep(for: .milliseconds(441))
-                guard !Task.isCancelled else { return }
-                blinkVisible = true
-            }
-        }
     }
 }

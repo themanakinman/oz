@@ -7,8 +7,10 @@ struct ChatTranscriptView: View {
     let messages: [ChatMessage]
     let status: AIThinkingStatus?
     let usage: AIUsage?
-    /// Cleared when the reader scrolls up, so a streaming reply stops dragging them back down.
+    /// Whether replies should keep the transcript pinned to its end.
     @State private var followsTail = true
+    /// Holds a newly sent prompt near the top until the reader scrolls elsewhere.
+    @State private var turnAnchorID: UUID?
 
     /// Below this a backward move is momentum settling, not the reader asking for the wheel.
     private static let deliberateScroll: CGFloat = 2
@@ -37,13 +39,12 @@ struct ChatTranscriptView: View {
                             .foregroundStyle(Theme.Colors.textTertiary)
                             .frame(maxWidth: .infinity, alignment: .trailing)
                     }
-                    Color.clear
-                        .frame(height: metrics.spacing.xxs)
-                        .id("ai-transcript-tail")
                 }
                 .padding(.horizontal, metrics.spacing.xxl)
                 .padding(.top, metrics.spacing.xl)
                 .padding(.bottom, metrics.spacing.chatTranscriptBottom)
+                // Put the tail target after the clearance so Jump to Latest reaches the real end.
+                .id("ai-transcript-tail")
             }
             .edgeDissolve()
             .thinScrollbar()
@@ -57,20 +58,39 @@ struct ChatTranscriptView: View {
                         + geometry.contentInsets.top
                         >= geometry.contentSize.height - metrics.spacing.chatFollowTailSlack)
             } action: { old, new in
-                // The offset is the only signal every device gives; the end wins, tested first
-                if new.atEnd {
-                    followsTail = true
+                // Reaching the end while content is too short to scroll does not undo the turn
+                // anchor; explicit reader scrolling down into the end resumes tail following.
+                if new.atEnd, new.offset > old.offset + Self.deliberateScroll {
+                    if turnAnchorID == nil { followsTail = true }
                 } else if new.offset < old.offset - Self.deliberateScroll {
                     followsTail = false
                 }
             }
-            .onChange(of: messages.count) { follow(proxy, always: true) }
-            .onChange(of: messages) { follow(proxy, always: false) }
-            .onChange(of: usage) { follow(proxy, always: false) }
+            .onScrollPhaseChange { _, phase in
+                if phase == .tracking || phase == .interacting || phase == .decelerating {
+                    turnAnchorID = nil
+                }
+            }
+            .onChange(of: messages) { oldMessages, newMessages in
+                if let sentMessage = newlyAppendedUserMessage(from: oldMessages, to: newMessages) {
+                    followsTail = false
+                    turnAnchorID = sentMessage.id
+                    scroll(proxy, to: sentMessage.id, anchor: .top, animated: true)
+                } else if let turnAnchorID,
+                    newMessages.contains(where: { $0.id == turnAnchorID })
+                {
+                    scroll(proxy, to: turnAnchorID, anchor: .top)
+                } else {
+                    turnAnchorID = nil
+                    follow(proxy)
+                }
+            }
+            .onChange(of: usage) { follow(proxy) }
             .overlay(alignment: .bottom) {
                 ResumeFollowingButton {
                     followsTail = true
-                    follow(proxy, always: true)
+                    turnAnchorID = nil
+                    scroll(proxy, to: "ai-transcript-tail", anchor: .bottom, animated: true)
                 }
                 .padding(.bottom, metrics.spacing.lg)
                 .opacity(followsTail ? 0 : 1)
@@ -80,10 +100,34 @@ struct ChatTranscriptView: View {
         }
     }
 
-    /// A sent message always comes into view; a growing reply only while the reader is at the end.
-    private func follow(_ proxy: ScrollViewProxy, always: Bool) {
-        guard always || followsTail else { return }
+    /// A growing reply follows the tail only while the reader has chosen to stay there.
+    private func follow(_ proxy: ScrollViewProxy) {
+        guard followsTail else { return }
         proxy.scrollTo("ai-transcript-tail", anchor: .bottom)
+    }
+
+    private func scroll<ID: Hashable>(
+        _ proxy: ScrollViewProxy, to id: ID, anchor: UnitPoint, animated: Bool = false
+    ) {
+        if animated {
+            withAnimation(.easeOut(duration: Theme.Duration.chatFooter)) {
+                proxy.scrollTo(id, anchor: anchor)
+            }
+        } else {
+            proxy.scrollTo(id, anchor: anchor)
+        }
+    }
+
+    /// A send appends the user prompt and its streaming assistant placeholder as one turn.
+    private func newlyAppendedUserMessage(
+        from oldMessages: [ChatMessage], to newMessages: [ChatMessage]
+    ) -> ChatMessage? {
+        guard newMessages.count == oldMessages.count + 2,
+            newMessages.prefix(oldMessages.count).elementsEqual(oldMessages),
+            newMessages[oldMessages.count].role == .user,
+            newMessages[oldMessages.count + 1].role == .assistant
+        else { return nil }
+        return newMessages[oldMessages.count]
     }
 }
 
