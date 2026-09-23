@@ -154,8 +154,8 @@ private struct AIEmptyState: View {
                 HStack(spacing: metrics.spacing.sm) {
                     Text("View history")
                     HStack(spacing: metrics.spacing.xxs) {
-                        KeyCapChip(text: "⌘")
-                        KeyCapChip(text: "H")
+                        KeyCapChip(text: "⌘", style: .plain)
+                        KeyCapChip(text: "H", style: .plain)
                     }
                 }
                 .font(metrics.typography.rowTrailing)

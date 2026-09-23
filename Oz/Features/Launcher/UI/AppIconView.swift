@@ -20,12 +20,22 @@ struct AppIconView: View {
     }
 
     var body: some View {
+        if let quicklink = app.quicklinkIcon {
+            QuicklinkIconView(
+                link: quicklink.link, symbolOverride: quicklink.iconSymbol,
+                size: pointSize ?? Theme.Size.settingsRowIcon)
+        } else {
+            standardIcon
+        }
+    }
+
+    private var standardIcon: some View {
         let size = pointSize.map { IconSize(points: $0, scale: displayScale) }
         // Keyed on the icon, not the entry: re-skinning an extension leaves `id` untouched.
         let request = IconRequest(Key(icon: app.iconKey, size: size))
         let warm = IconCache.cached(app.iconSource, fileURL: app.url, size: size)
         let image = warm ?? (loaded?.request == request ? loaded?.image : nil)
-        Group {
+        return Group {
             if let image {
                 Image(nsImage: image).resizable()
             } else {

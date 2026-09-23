@@ -154,7 +154,7 @@ struct QuicklinkEditorPanel: View {
                 showingIconPicker = true
             } label: {
                 HStack(spacing: Theme.Spacing.sm) {
-                    SymbolImage(name: resolvedSymbol, size: 14)
+                    QuicklinkIconView(link: link, symbolOverride: iconSymbol, size: 14)
                     Text(iconSymbol == nil ? "Automatic" : "Custom")
                         .lineLimit(1)
                     Spacer(minLength: 0)
@@ -217,8 +217,6 @@ struct QuicklinkEditorPanel: View {
     private var automaticSymbol: String {
         QuicklinkDestination.detect(trimmed(link))?.defaultSymbol ?? Quicklink.sfSymbol
     }
-
-    private var resolvedSymbol: String { iconSymbol ?? automaticSymbol }
 
     private func insert(_ token: String) {
         link += token

@@ -51,8 +51,13 @@ shadow: a one-letter "scheme" is a Windows drive letter, and a `scheme:` whose r
 digits is a `host:port`. A literal space is rescued by encoding it; anything else illegal is a real
 error, since blanket re-encoding would corrupt the `%xx` the template engine already produced.
 
-The detected kind decides the icon a row draws when the quicklink has no icon of its own, and
-`usesURLEncoding` decides whether substituted values are percent-encoded. That question is answered
+When no SF Symbol override is chosen, a web quicklink reads the destination page's declared icon,
+then falls back to the host's `favicon.ico` and `apple-touch-icon.png`. A deeplink uses its installed
+handler's app icon, and a local path uses its file or app icon. The detected kind's symbol remains the
+fallback while an icon loads or when none is available. The editor previews this automatic icon as the
+link is entered;
+the same icon appears in Search Quicklinks and the launcher. `usesURLEncoding` decides whether
+substituted values are percent-encoded. That question is answered
 from the link's **prefix**, not from a parsed destination, because the encoding has to be chosen
 before the placeholders are resolved.
 

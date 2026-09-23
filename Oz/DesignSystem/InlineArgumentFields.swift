@@ -23,12 +23,20 @@ struct InlineArgumentFields: View {
     let openOptions: (String) -> Void
     /// ↵ from inside a field acts like ↵ on the row itself.
     let onSubmit: () -> Void
+    var iconLink: String? = nil
+    var iconSymbolOverride: String? = nil
+    var font: Font? = nil
+    var fieldHeight: CGFloat? = nil
+    var fontSize: CGFloat? = nil
     /// Fields the caret has left behind. Nothing is owed until one was visited and not answered.
     @State private var visited: Set<String> = []
 
     var body: some View {
         HStack(spacing: metrics.spacing.xs) {
-            if let symbol {
+            if let iconLink {
+                QuicklinkIconView(
+                    link: iconLink, symbolOverride: iconSymbolOverride, size: Self.height(metrics))
+            } else if let symbol {
                 Image(nsImage: IconCache.symbolIcon(named: symbol))
                     .resizable()
                     .frame(width: Self.height(metrics), height: Self.height(metrics))
@@ -38,14 +46,16 @@ struct InlineArgumentFields: View {
                 if argument.options.isEmpty {
                     ArgumentField(
                         argument: argument, text: value(argument.id),
-                        isFocused: focused == argument.id, isOwed: isOwed, onSubmit: onSubmit
+                        isFocused: focused == argument.id, isOwed: isOwed, onSubmit: onSubmit,
+                        font: font, fieldHeight: fieldHeight, fontSize: fontSize
                     )
                     .focused($focused, equals: argument.id)
                 } else {
                     ArgumentChoiceField(
                         argument: argument, text: value(argument.id),
                         isFocused: focused == argument.id, isOwed: isOwed,
-                        onOpen: { openOptions(argument.id) }
+                        onOpen: { openOptions(argument.id) }, font: font,
+                        fieldHeight: fieldHeight, fontSize: fontSize
                     )
                     .focused($focused, equals: argument.id)
                 }
@@ -63,14 +73,26 @@ struct InlineArgumentFields: View {
 
     /// The header shrinks the search field to exactly the room left over.
     static func totalWidth(
-        for arguments: [InlineArgument], hasIcon: Bool, metrics: InterfaceMetrics
+        for arguments: [InlineArgument], hasIcon: Bool, metrics: InterfaceMetrics,
+        fontSize: CGFloat? = nil
     ) -> CGFloat {
-        let fields = arguments.reduce(0) { $0 + fieldWidth(for: $1, metrics: metrics) }
+        let fields = arguments.reduce(0) {
+            $0 + fieldWidth(for: $1, metrics: metrics, fontSize: fontSize)
+        }
         let gaps = CGFloat(arguments.count + (hasIcon ? 0 : -1)) * metrics.spacing.xs
         return fields + gaps + (hasIcon ? height(metrics) : 0)
     }
 
-    static func fieldWidth(for argument: InlineArgument, metrics: InterfaceMetrics) -> CGFloat {
+    static func fieldWidth(
+        for argument: InlineArgument, metrics: InterfaceMetrics, fontSize: CGFloat? = nil
+    ) -> CGFloat {
+        if let fontSize {
+            let title = CGFloat(argument.title.count) * fontSize * 0.56
+            let scale = fontSize / metrics.typography.searchFieldSize
+            return min(
+                max(title + metrics.scaled(28) * scale, metrics.scaled(108) * scale),
+                metrics.scaled(220) * scale)
+        }
         let title = CGFloat(argument.title.count) * metrics.scaled(7)
         return min(max(title + metrics.scaled(34), metrics.scaled(72)), metrics.scaled(160))
     }
@@ -84,12 +106,16 @@ private struct ArgumentFieldChrome: ViewModifier {
     /// Visited, left, and still empty — the only state that earns a warning edge.
     let isOwed: Bool
     @Binding var hovered: Bool
+    let fieldHeight: CGFloat?
+    let fontSize: CGFloat?
 
     func body(content: Content) -> some View {
         content
-            .frame(width: InlineArgumentFields.fieldWidth(for: argument, metrics: metrics))
+            .frame(
+                width: InlineArgumentFields.fieldWidth(
+                    for: argument, metrics: metrics, fontSize: fontSize))
             .padding(.horizontal, metrics.spacing.sm)
-            .frame(height: InlineArgumentFields.height(metrics))
+            .frame(height: fieldHeight ?? InlineArgumentFields.height(metrics))
             .background(
                 RoundedRectangle(cornerRadius: metrics.radius.row, style: .continuous).fill(fill)
             )
@@ -128,6 +154,9 @@ private struct ArgumentField: View {
     let isFocused: Bool
     let isOwed: Bool
     let onSubmit: () -> Void
+    let font: Font?
+    let fieldHeight: CGFloat?
+    let fontSize: CGFloat?
     @State private var hovered = false
 
     var body: some View {
@@ -136,14 +165,14 @@ private struct ArgumentField: View {
             prompt: Text(argument.title).foregroundStyle(Theme.Colors.textTertiary)
         )
         .textFieldStyle(.plain)
-        .font(metrics.typography.rowTrailing)
+        .font(font ?? metrics.typography.rowTrailing)
         .tint(Theme.Colors.textPrimary)
         .onSubmit(onSubmit)
         .multilineTextAlignment(.center)
         .modifier(
             ArgumentFieldChrome(
                 argument: argument, isFocused: isFocused, isOwed: isOwed && text.isEmpty,
-                hovered: $hovered))
+                hovered: $hovered, fieldHeight: fieldHeight, fontSize: fontSize))
     }
 }
 
@@ -155,12 +184,15 @@ private struct ArgumentChoiceField: View {
     let isFocused: Bool
     let isOwed: Bool
     let onOpen: () -> Void
+    let font: Font?
+    let fieldHeight: CGFloat?
+    let fontSize: CGFloat?
     @State private var hovered = false
 
     var body: some View {
         HStack(spacing: metrics.spacing.xxs) {
             Text(text.isEmpty ? argument.title : text)
-                .font(metrics.typography.rowTrailing)
+                .font(font ?? metrics.typography.rowTrailing)
                 .foregroundStyle(
                     text.isEmpty ? Theme.Colors.textTertiary : Theme.Colors.textPrimary
                 )
@@ -173,7 +205,7 @@ private struct ArgumentChoiceField: View {
         .modifier(
             ArgumentFieldChrome(
                 argument: argument, isFocused: isFocused, isOwed: isOwed && text.isEmpty,
-                hovered: $hovered)
+                hovered: $hovered, fieldHeight: fieldHeight, fontSize: fontSize)
         )
         .contentShape(Rectangle())
         .focusable()

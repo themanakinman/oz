@@ -123,6 +123,8 @@ struct AppEntry: Identifiable, Hashable, Sendable {
     var iconStamp: Int = 0
     /// Set by the feature that produced the entry when its glyph isn't derivable from `kind`.
     var iconOverride: EntryIcon?
+    /// Carries the destination to the launcher icon view.
+    var quicklinkIcon: Quicklink?
     /// What this entry comes from — an extension's title. Labels the row, and matches weakly.
     var ownerName: String?
     /// The searchable form of every field above, built at publish by `buildAliases`.
@@ -229,7 +231,12 @@ struct AppEntry: Identifiable, Hashable, Sendable {
     }
 
     /// Icon identity for a row's async load: re-skinning changes the glyph while `id` stays put.
-    var iconKey: String { "\(id)|\(iconSource)" }
+    var iconKey: String {
+        if let quicklinkIcon {
+            return "\(id)|\(quicklinkIcon.link)|\(quicklinkIcon.iconSymbol ?? "automatic")"
+        }
+        return "\(id)|\(iconSource)"
+    }
 }
 
 extension AppEntry {
@@ -273,6 +280,7 @@ extension AppEntry {
             bundleID: nil, kind: .quicklink,
             symbolName: quicklink.iconSymbol
                 ?? QuicklinkDestination.detect(quicklink.link)?.defaultSymbol)
+        quicklinkIcon = quicklink
     }
 
     /// No bundle id: that would key every shortcut's alias and ranking to the Shortcuts app.

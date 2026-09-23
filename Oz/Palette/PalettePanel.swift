@@ -178,13 +178,17 @@ final class PalettePanel: NSPanel {
         var actualRange = NSRange()
         let screenRect = editor.firstRect(
             forCharacterRange: NSRange(location: location, length: 0), actualRange: &actualRange)
-        guard !screenRect.isEmpty else { return }
+        // An insertion point has zero width, which makes CGRect.isEmpty reject a valid caret.
+        guard screenRect.height > 0 else { return }
 
         let windowPoint = window.convertPoint(fromScreen: screenRect.origin)
         let contentPoint = contentView.convert(windowPoint, from: nil)
+        let caretY = contentView.isFlipped
+            ? contentPoint.y - screenRect.height
+            : contentView.bounds.maxY - contentPoint.y - screenRect.height
         let caretRect = CGRect(
             x: contentPoint.x,
-            y: contentView.bounds.maxY - contentPoint.y - screenRect.height,
+            y: caretY,
             width: max(screenRect.width, 1),
             height: max(screenRect.height, 1))
         let fieldHitArea = fieldFrame.insetBy(dx: -3, dy: -3)
@@ -194,15 +198,18 @@ final class PalettePanel: NSPanel {
             return
         }
 
+        let caretHeight = max(caretRect.height, fieldFrame.height * Self.searchCaretHeightFraction)
         state.noteSearchCaretPosition(
             CGRect(
                 x: caretRect.minX - fieldFrame.minX,
-                y: caretRect.minY - fieldFrame.minY,
+                y: (fieldFrame.height - caretHeight) / 2,
                 width: caretRect.width,
-                height: caretRect.height))
+                height: caretHeight))
         editor.insertionPointColor = .clear
         editor.updateInsertionPointStateAndRestartTimer(!searchCaretHidden)
     }
+
+    private static let searchCaretHeightFraction: CGFloat = 0.85
 
     /// Every event either mechanism sets a cursor on, so neither gets the last word.
     private static let cursorEvents: Set<NSEvent.EventType> = [

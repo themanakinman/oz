@@ -1468,28 +1468,41 @@ private struct SmoothPaletteCaret: View {
     @State private var blinkVisible = true
 
     var body: some View {
-        Rectangle()
-            .fill(Theme.Colors.textPrimary)
-            .frame(width: 1.5, height: max(frame.height, 1))
-            .offset(x: frame.minX, y: frame.minY)
-            .opacity(typing || blinkVisible ? 1 : 0)
-            .animation(
-                .timingCurve(0.16, 1, 0.3, 1, duration: 0.19), value: frame.origin)
-            .allowsHitTesting(false)
-            .task(id: typing) {
-                guard !typing else {
-                    blinkVisible = true
-                    return
+        ZStack {
+            Capsule()
+                .fill(Theme.Colors.paletteCaretGradient)
+                .frame(width: Theme.Size.paletteCaretWidth, height: max(frame.height, 1))
+                .blur(radius: Theme.Blur.paletteCaretGlow)
+                .opacity(Theme.Colors.paletteCaretGlowOpacity)
+            Capsule()
+                .fill(Theme.Colors.textPrimary)
+                .frame(width: Theme.Size.paletteCaretWidth, height: max(frame.height, 1))
+                .overlay(alignment: .center) {
+                    Capsule()
+                        .fill(Theme.Colors.paletteCaretGradient)
+                        .opacity(Theme.Colors.paletteCaretOpacity)
                 }
+        }
+        .frame(width: Theme.Size.paletteCaretWidth, height: max(frame.height, 1))
+        .offset(x: frame.minX, y: frame.minY)
+        .opacity(typing || blinkVisible ? 1 : 0)
+        .animation(
+            .timingCurve(0.16, 1, 0.3, 1, duration: 0.19), value: frame.origin)
+        .allowsHitTesting(false)
+        .task(id: typing) {
+            guard !typing else {
                 blinkVisible = true
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: .milliseconds(609))
-                    guard !Task.isCancelled else { return }
-                    blinkVisible = false
-                    try? await Task.sleep(for: .milliseconds(441))
-                    guard !Task.isCancelled else { return }
-                    blinkVisible = true
-                }
+                return
             }
+            blinkVisible = true
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(609))
+                guard !Task.isCancelled else { return }
+                blinkVisible = false
+                try? await Task.sleep(for: .milliseconds(441))
+                guard !Task.isCancelled else { return }
+                blinkVisible = true
+            }
+        }
     }
 }

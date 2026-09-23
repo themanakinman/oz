@@ -57,6 +57,7 @@ enum Theme {
     enum Blur {
         /// Unreadable at full size without smearing the row; the scramble is what hides it.
         static let redaction: CGFloat = 3
+        static let paletteCaretGlow: CGFloat = 5.2
     }
 
     enum Size {
@@ -92,6 +93,7 @@ enum Theme {
         static let headerHeight: CGFloat = 44
         /// Fixed slot for the header glyph, so the field starts at one x in every mode.
         static let headerIconSlot: CGFloat = 22
+        static let paletteCaretWidth: CGFloat = 2
         /// Room above the search row, constant so typing never shifts the bar.
         static let headerPadding: CGFloat = 5.6
         /// Collapsed compact bar: the search row centered in symmetric `headerPadding` slack.
@@ -309,7 +311,7 @@ enum Theme {
     /// System text styles (not hardcoded sizes) so the UI honors Dynamic Type.
     enum Typography {
         /// One size, two frameworks: `TextTrailingDragHandle` measures what the field renders.
-        static let searchFieldSize: CGFloat = 20
+        static let searchFieldSize: CGFloat = 35
         static let searchField = Font.system(size: searchFieldSize, weight: .regular)
         /// `NSFont` is not `Sendable`, hence the isolation; every reader is a view anyway.
         @MainActor static let searchFieldNSFont = NSFont.systemFont(
@@ -410,6 +412,14 @@ enum Theme {
         static let textPrimary = ramp(dark: 1.0, light: 1.0)
         static let textSecondary = ramp(dark: 0.60, light: 0.60)
         static let textTertiary = ramp(dark: 0.40, light: 0.42)
+        static let paletteCaretGradient = LinearGradient(
+            stops: [
+                .init(color: Color(red: 0.98, green: 0.86, blue: 0.68), location: 0),
+                .init(color: Color(red: 0.49, green: 0.68, blue: 0.82), location: 0.5),
+                .init(color: Color(red: 0.66, green: 0.76, blue: 0.40), location: 1),
+            ], startPoint: .top, endPoint: .bottom)
+        static let paletteCaretGlowOpacity = 1.0
+        static let paletteCaretOpacity = 0.5
         static let menuSymbol = ramp(dark: 0.70, light: 0.70)
         static let noteText = ramp(dark: 0.90, light: 0.85)
         static let iconPlaceholder = ramp(dark: 0.06, light: 0.06)

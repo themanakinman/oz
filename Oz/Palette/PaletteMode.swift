@@ -43,7 +43,7 @@ enum PaletteMode: String, CaseIterable, Identifiable {
         switch self {
         case .launcher: return ""
         case .clipboard: return "Type to filter entries…"
-        case .ai: return "Ask anything…"
+        case .ai: return ""
         case .aiHistory: return "Search chats…"
         case .calculatorHistory: return "Do math, convert units, or search your past calculations…"
         case .emoji: return "Search emoji and symbols…"

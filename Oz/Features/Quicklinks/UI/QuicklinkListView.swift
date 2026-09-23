@@ -100,9 +100,9 @@ private struct QuicklinkRow: View {
 
     var body: some View {
         HStack(spacing: metrics.spacing.lg) {
-            Image(nsImage: IconCache.symbolIcon(named: quicklink.symbol))
-                .resizable()
-                .frame(width: metrics.size.rowIcon, height: metrics.size.rowIcon)
+            QuicklinkIconView(
+                link: quicklink.link, symbolOverride: quicklink.iconSymbol,
+                size: metrics.size.rowIcon)
             VStack(alignment: .leading, spacing: metrics.spacing.xxs) {
                 Text(quicklink.name)
                     .font(metrics.typography.rowTitle)
@@ -146,7 +146,9 @@ struct QuicklinkPreview: View {
         if let quicklink {
             VStack(alignment: .leading, spacing: 0) {
                 Spacer(minLength: 0)
-                SymbolImage(name: quicklink.symbol, size: Self.glyphSize)
+                QuicklinkIconView(
+                    link: quicklink.link, symbolOverride: quicklink.iconSymbol,
+                    size: Self.glyphSize)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, metrics.spacing.xl)
                 Spacer(minLength: 0)

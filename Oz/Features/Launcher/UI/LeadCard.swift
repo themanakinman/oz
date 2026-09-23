@@ -4,11 +4,12 @@ import SwiftUI
 private struct LeadCardChrome: ViewModifier {
     @Environment(\.metrics) private var metrics
     let selected: Bool
+    let baseFill: Color
     @State private var hovered = false
 
     func body(content: Content) -> some View {
         content
-            .background(shape.fill(Theme.Colors.cardFill))
+            .background(shape.fill(baseFill))
             .background(shape.fill(fill))
             .armedHover($hovered)
     }
@@ -26,8 +27,8 @@ private struct LeadCardChrome: ViewModifier {
 
 extension View {
     /// Padding stays each card's own: a meeting card is deliberately shorter than an answer.
-    func leadCard(selected: Bool) -> some View {
-        modifier(LeadCardChrome(selected: selected))
+    func leadCard(selected: Bool, baseFill: Color = Theme.Colors.cardFill) -> some View {
+        modifier(LeadCardChrome(selected: selected, baseFill: baseFill))
     }
 }
 
@@ -37,6 +38,7 @@ struct LeadCardColumn: View {
     let text: AttributedString
     let badge: String?
     var weight: Font.Weight = .medium
+    var badgeHasBackground = true
 
     var body: some View {
         VStack(spacing: metrics.spacing.md) {
@@ -44,7 +46,7 @@ struct LeadCardColumn: View {
                 .font(metrics.typography.calcResult.weight(weight))
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
-            if let badge { LeadCardBadge(text: badge) }
+            if let badge { LeadCardBadge(text: badge, hasBackground: badgeHasBackground) }
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, metrics.spacing.md)
@@ -55,6 +57,7 @@ struct LeadCardColumn: View {
 private struct LeadCardBadge: View {
     @Environment(\.metrics) private var metrics
     let text: String
+    let hasBackground: Bool
 
     var body: some View {
         Text(text)
@@ -62,11 +65,13 @@ private struct LeadCardBadge: View {
             .lineLimit(1)
             .minimumScaleFactor(0.6)
             .foregroundStyle(.secondary)
-            .padding(.horizontal, metrics.spacing.sm)
-            .padding(.vertical, metrics.spacing.xxs)
-            .background(
-                RoundedRectangle(cornerRadius: metrics.radius.keyCap, style: .continuous)
-                    .fill(Theme.Colors.controlSurface)
-            )
+            .padding(.horizontal, hasBackground ? metrics.spacing.sm : 0)
+            .padding(.vertical, hasBackground ? metrics.spacing.xxs : 0)
+            .background {
+                if hasBackground {
+                    RoundedRectangle(cornerRadius: metrics.radius.keyCap, style: .continuous)
+                        .fill(Theme.Colors.controlSurface)
+                }
+            }
     }
 }

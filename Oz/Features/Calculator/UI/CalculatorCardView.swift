@@ -48,13 +48,13 @@ struct CalculatorCard: View {
                 HStack(spacing: 0) {
                     LeadCardColumn(
                         text: CalcSyntax.highlighted(result.expression),
-                        badge: result.sourceBadge)
+                        badge: result.sourceBadge, badgeHasBackground: false)
                     Image(systemName: "arrow.right")
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(.tertiary)
                     LeadCardColumn(
                         text: CalcSyntax.highlighted(display), badge: result.targetBadge,
-                        weight: .semibold)
+                        weight: .semibold, badgeHasBackground: false)
                 }
                 .fixedSize(horizontal: false, vertical: true)
             case .error(let message):
@@ -71,7 +71,7 @@ struct CalculatorCard: View {
         }
         .padding(.horizontal, metrics.spacing.xl)
         .padding(.vertical, metrics.spacing.xxxl)
-        .leadCard(selected: selected)
+        .leadCard(selected: selected, baseFill: .clear)
     }
 }
 
