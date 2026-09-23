@@ -59,21 +59,19 @@ struct ClipboardList: View {
                         case .item(let item, let resultIndex):
                             ClipboardRow(
                                 item: item, selected: item.id == selectedID,
-                                imageURL: store.imageURL(for: item), resultIndex: resultIndex
-                            )
-                            .selectionFrame(item.id == selectedID)
-                            .contentShape(Rectangle())
-                            // The light catcher: `.contextMenu` stalls.
-                            .onRightClick { onActions(item) }
-                            .clipDraggable(
-                                payload: { onDragPayload(item) },
+                                imageURL: store.imageURL(for: item), resultIndex: resultIndex,
                                 onSelect: { onSelect(item) },
                                 onActivate: {
                                     onSelect(item)
                                     onActivate()
                                 },
+                                onDragPayload: { onDragPayload(item) },
                                 onDropped: onDropped
                             )
+                            .selectionFrame(item.id == selectedID)
+                            .contentShape(Rectangle())
+                            // The light catcher: `.contextMenu` stalls.
+                            .onRightClick { onActions(item) }
                         }
                     }
                 }
@@ -128,15 +126,12 @@ private struct ClipboardRow: View {
     let selected: Bool
     let imageURL: URL?
     let resultIndex: Int
+    let onSelect: () -> Void
+    let onActivate: () -> Void
+    let onDragPayload: () -> ClipDragPayload?
+    let onDropped: () -> Void
     @Environment(PaletteState.self) private var palette
     @State private var hovered = false
-
-    /// Selection wins over hover when a row is both; otherwise hover shows its fainter layer.
-    private var fill: Color {
-        if selected { return Theme.Colors.selection }
-        if hovered { return Theme.Colors.rowHover }
-        return .clear
-    }
 
     var body: some View {
         HStack(spacing: metrics.spacing.lg) {
@@ -145,6 +140,7 @@ private struct ClipboardRow: View {
                 .font(metrics.typography.menuRow)
                 .lineLimit(1)
                 .truncationMode(.tail)
+                .paletteResultText(isActive: selected || hovered)
             Spacer(minLength: 0)
             if palette.commandHeld,
                 let shortcut = PaletteState.resultShortcut(at: resultIndex)
@@ -158,11 +154,16 @@ private struct ClipboardRow: View {
         .animation(.easeOut(duration: 0.12), value: palette.commandHeld)
         .padding(.horizontal, metrics.spacing.md)
         .padding(.vertical, metrics.spacing.sm)
-        .background(
-            RoundedRectangle(cornerRadius: metrics.radius.row, style: .continuous)
-                .fill(fill)
-        )
         .armedHover($hovered)
+        .clipDraggable(
+            payload: onDragPayload,
+            onSelect: onSelect,
+            onActivate: onActivate,
+            onDropped: onDropped,
+            onHoverChanged: { inside in
+                hovered = inside && palette.hoverHighlightArmed
+            }
+        )
     }
 
     private var previewText: String {
@@ -293,12 +294,18 @@ struct ClipboardPreview: View {
 
     var body: some View {
         if let item {
-            VStack(alignment: .leading, spacing: 0) {
-                content(for: item)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                ClipboardInfoSection(item: item, imageURL: store.imageURL(for: item))
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    content(for: item)
+                        .frame(maxWidth: .infinity, alignment: .top)
+                    ClipboardInfoSection(item: item, imageURL: store.imageURL(for: item))
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, metrics.size.bottomBarHeight)
+                .hideNativeScrollers()
             }
-            .padding(.horizontal, 12)
+            .edgeDissolve()
+            .thinScrollbar()
         } else {
             Color.clear
         }
@@ -311,12 +318,10 @@ struct ClipboardPreview: View {
             if let color = item.colorValue {
                 ColorPreview(color: color, text: item.text ?? "")
             } else {
-                ScrollView {
-                    Text(item.text ?? "")
-                        .font(.system(.subheadline, design: .monospaced))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                }
+                Text(item.text ?? "")
+                    .font(.system(.subheadline, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
             }
         case .image:
             AsyncThumbnail(url: store.imageURL(for: item), maxPixel: metrics.size.clipboardPreviewPixel) {
@@ -381,7 +386,6 @@ private struct ClipboardInfoSection: View {
             VStack(spacing: 0) {
                 let rows = self.rows
                 ForEach(rows) { row in
-                    if row.id != rows.first?.id { Divider() }
                     HStack(spacing: metrics.spacing.sm) {
                         Text(row.label).foregroundStyle(.secondary)
                         Spacer(minLength: metrics.spacing.lg)

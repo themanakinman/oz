@@ -199,8 +199,7 @@ struct ExtensionCommandScreen: PaletteScreen {
                         items: items, selection: menuSelection.wrappedValue,
                         chosen: chosen, assetsPath: assetsPath,
                         width: ExtensionSearchAccessoryButton.listWidth,
-                        searchPlaceholder: "Search…", onSelect: onActivate,
-                        onHighlight: { menuSelection.wrappedValue = $0 }))
+                        searchPlaceholder: "Search…", onSelect: onActivate))
             },
             activate: { index in
                 extensions.chooseAccessorySelection(accessory, value: items[index].value)

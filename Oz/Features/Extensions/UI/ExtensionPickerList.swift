@@ -5,8 +5,6 @@ struct ExtensionPickerList: View {
     private var form: ExtensionFormMetrics { ExtensionFormMetrics(scale: metrics.scale) }
     @Environment(\.metrics) private var metrics
     @Environment(\.isDarkAppearance) private var isDark
-    /// Read for `hoverHighlightArmed`: a list landing under the pointer must light no row.
-    @Environment(PaletteState.self) private var palette
     private var menuListInset: CGFloat { metrics.spacing.md }
     let items: [ExtensionPickerItem]
     let selection: Int
@@ -18,8 +16,6 @@ struct ExtensionPickerList: View {
     var width: CGFloat?
     var searchPlaceholder: String?
     let onSelect: (Int) -> Void
-    /// Moves the highlight under the pointer, so mouse and keyboard share one selection.
-    let onHighlight: (Int) -> Void
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let searchPlaceholder {
@@ -70,7 +66,6 @@ struct ExtensionPickerList: View {
                                 onActivate: { onSelect(index) }
                             )
                             .id(index)
-                            .onHover { if $0, palette.hoverHighlightArmed { onHighlight(index) } }
                         }
                     }
                     .padding(searchPlaceholder == nil ? 0 : menuListInset)

@@ -10,7 +10,7 @@ struct CalculatorHistoryList: View {
     /// Live answer typed into the history search; same flat-index-0 contract as the launcher.
     var calc: CalcResult?
     var calcSelected = false
-    var onActivateCalc: () -> Void = {}
+    var onCopyCalc: () -> Void = {}
     var onCalcActions: () -> Void = {}
     let onSelect: (CalcHistoryEntry) -> Void
     let onActivate: () -> Void
@@ -67,9 +67,8 @@ struct CalculatorHistoryList: View {
                         case .header(let title):
                             SectionHeader(title: title, isFirst: row.id == rows.first?.id)
                         case .calc(let result):
-                            CalculatorCard(result: result, selected: calcSelected)
+                            CalculatorCard(result: result, onCopy: onCopyCalc)
                                 .contentShape(Rectangle())
-                                .onTapGesture(perform: onActivateCalc)
                                 .onRightClick(perform: onCalcActions)
                                 .padding(.bottom, metrics.spacing.xs)
                                 .selectionFrame(calcSelected)
@@ -113,12 +112,6 @@ private struct CalcHistoryRow: View {
 
     private var format: CalcNumberFormat { core.calcNumberFormat }
 
-    private var fill: Color {
-        if selected { return Theme.Colors.selection }
-        if hovered { return Theme.Colors.rowHover }
-        return .clear
-    }
-
     var body: some View {
         HStack(spacing: metrics.spacing.lg) {
             RoundedRectangle(cornerRadius: metrics.radius.thumbnail, style: .continuous)
@@ -135,17 +128,15 @@ private struct CalcHistoryRow: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
+                .paletteResultText(isActive: selected || hovered)
             Spacer(minLength: metrics.spacing.xl)
             Text(format.localized(entry.result))
                 .font(metrics.typography.rowTitle.weight(.semibold))
                 .lineLimit(1)
+                .paletteResultText(isActive: selected || hovered)
         }
         .padding(.horizontal, metrics.spacing.md)
         .padding(.vertical, metrics.spacing.sm)
-        .background(
-            RoundedRectangle(cornerRadius: metrics.radius.row, style: .continuous)
-                .fill(fill)
-        )
         .armedHover($hovered)
     }
 }

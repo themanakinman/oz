@@ -89,6 +89,7 @@ struct ExtensionPickerRow: View {
     var checked = false
     let selected: Bool
     let onActivate: () -> Void
+    @State private var hovered = false
 
     var body: some View {
         Button(action: onActivate) {
@@ -100,6 +101,7 @@ struct ExtensionPickerRow: View {
                 Text(title)
                     .font(metrics.typography.menuRow)
                     .lineLimit(1)
+                    .paletteResultText(isActive: selected || hovered)
                 Spacer(minLength: metrics.spacing.sm)
                 if let detail {
                     Text(detail)
@@ -120,11 +122,8 @@ struct ExtensionPickerRow: View {
                 maxHeight: form.popoverRowHeight, alignment: .leading
             )
             .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: metrics.radius.menuRow, style: .continuous)
-                    .fill(selected ? Theme.Colors.menuHover : Color.clear)
-            )
         }
         .buttonStyle(.plain)
+        .armedHover($hovered)
     }
 }

@@ -12,7 +12,6 @@ struct ExtensionDetailBody: View {
         HStack(spacing: 0) {
             markdownPane
             if let metadata {
-                Rectangle().fill(Theme.Colors.separator).frame(width: 1)
                 metadataPane(metadata)
             }
         }
@@ -94,8 +93,6 @@ struct ExtensionMetadataView: View {
                     row(title: child.string("title")) {
                         ExtensionTagListView(tags: child.children, assetsPath: assetsPath)
                     }
-                case "Detail.Metadata.Separator":
-                    Rectangle().fill(Theme.Colors.separator).frame(height: 1)
                 default:
                     EmptyView()
                 }

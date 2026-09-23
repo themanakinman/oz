@@ -62,6 +62,7 @@ private struct NoteHeadingMenuRow: View {
                 Text(title)
                     .font(Theme.Typography.menuRow)
                     .lineLimit(1)
+                    .paletteResultText(isActive: isCurrent || hovered)
                 Spacer(minLength: Theme.Spacing.sm)
                 HStack(spacing: Theme.Spacing.xxs) {
                     ForEach(Array(shortcut.enumerated()), id: \.offset) { _, glyph in
@@ -77,7 +78,7 @@ private struct NoteHeadingMenuRow: View {
             .contentShape(Rectangle())
             .background(
                 RoundedRectangle(cornerRadius: Theme.Radius.menuRow, style: .continuous)
-                    .fill(hovered ? Theme.Colors.menuHover : Color.clear))
+                    .fill(Color.clear))
         }
         .buttonStyle(.plain)
         .focusable(false)

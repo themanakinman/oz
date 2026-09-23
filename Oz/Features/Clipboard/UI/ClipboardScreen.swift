@@ -126,9 +126,6 @@ struct ClipboardScreen: PaletteScreen {
                     onDropped: { core.clipboardCoordinator.clipDropped() }
                 )
                 .frame(width: metrics.size.clipboardListWidth)
-                Rectangle()
-                    .fill(Theme.Colors.separator)
-                    .frame(width: 1)
                 ClipboardPreview(item: selected)
             }
         }

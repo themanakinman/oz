@@ -51,11 +51,6 @@ struct ExtensionActionsPanel: View {
     @Binding var selection: Int
     let onActivate: (Int) -> Void
 
-    /// The palette arms this only once the pointer has moved of its own accord.
-    @Environment(PaletteState.self) private var palette
-    /// A hovered row is already visible, so scrolling would drag the list under it.
-    @State private var hoverSelection: Int?
-
     private var panel: Metrics { Metrics(interface: metrics) }
 
     var body: some View {
@@ -76,7 +71,7 @@ struct ExtensionActionsPanel: View {
                 verticalOffset: -metrics.spacing.xxs / 2)
         }
         .frame(width: panel.width)
-        .glassEffect(.regular, in: shape)
+        .paletteSurface(in: shape, backgroundOpacity: 0.9)
     }
 
     @ViewBuilder
@@ -113,7 +108,6 @@ struct ExtensionActionsPanel: View {
                                 selected: index == selection,
                                 onActivate: { onActivate(index) }
                             )
-                            .onContinuousHover { if case .active = $0 { hover(index) } }
                         }
                         .id(index)
                     }
@@ -125,9 +119,6 @@ struct ExtensionActionsPanel: View {
             // `never`, not `hidden`: hidden still lets AppKit claim the scroller's gutter.
             .scrollIndicators(.never)
             .onChange(of: selection) {
-                let movedByPointer = hoverSelection == selection
-                hoverSelection = nil
-                guard !movedByPointer else { return }
                 // No anchor: reveal the row, never re-centre the list around it.
                 proxy.scrollTo(selection)
             }
@@ -164,13 +155,6 @@ struct ExtensionActionsPanel: View {
             Color.clear.frame(height: panel.rowSpacing)
         }
     }
-
-    /// Armed only once the pointer has moved of its own accord, so a scroll past it lights nothing.
-    private func hover(_ index: Int) {
-        guard palette.hoverHighlightArmed, index != selection else { return }
-        hoverSelection = index
-        selection = index
-    }
 }
 
 /// Its own row, not the palette's: that one is file-private.
@@ -179,6 +163,7 @@ private struct ExtensionActionRow: View {
     let item: ExtensionActionItem
     let selected: Bool
     let onActivate: () -> Void
+    @State private var hovered = false
 
     private var panel: Metrics { Metrics(interface: metrics) }
 
@@ -191,6 +176,7 @@ private struct ExtensionActionRow: View {
                     .font(metrics.typography.menuRow)
                     .foregroundStyle(item.isDestructive ? Color.red : Color.primary)
                     .lineLimit(1)
+                    .paletteResultText(isActive: selected || hovered)
                 Spacer(minLength: metrics.spacing.sm)
                 if let shortcut = item.shortcut {
                     HStack(spacing: metrics.spacing.xxs) {
@@ -207,11 +193,8 @@ private struct ExtensionActionRow: View {
                 alignment: .leading
             )
             .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: metrics.radius.menuRow, style: .continuous)
-                    .fill(selected ? Theme.Colors.menuHover : Color.clear)
-            )
         }
         .buttonStyle(.plain)
+        .armedHover($hovered)
     }
 }

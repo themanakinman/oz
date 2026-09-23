@@ -47,22 +47,30 @@ struct PaletteBackground: View {
 private struct PaletteSurface<S: Shape>: ViewModifier {
     @Environment(AppSettings.self) private var settings
     let shape: S
+    var backgroundOpacity: CGFloat?
 
     func body(content: Content) -> some View {
         content.background {
-            shape.fill(Theme.Colors.panelScrim(transparency: settings.paletteTransparency))
-            .overlay {
-                shape.stroke(
-                    Theme.Colors.panelEdgeHighlight(transparency: settings.paletteTransparency),
-                    lineWidth: Theme.Size.hairline)
-            }
-            .clipShape(shape)
+            shape.fill(background)
+                .overlay {
+                    shape.stroke(
+                        Theme.Colors.panelEdgeHighlight(transparency: settings.paletteTransparency),
+                        lineWidth: Theme.Size.hairline)
+                }
+                .clipShape(shape)
         }
+    }
+
+    private var background: Color {
+        if let backgroundOpacity {
+            return Theme.Colors.submenuSurface(opacity: backgroundOpacity)
+        }
+        return Theme.Colors.panelScrim(transparency: settings.paletteTransparency)
     }
 }
 
 extension View {
-    func paletteSurface(in shape: some Shape) -> some View {
-        modifier(PaletteSurface(shape: AnyShape(shape)))
+    func paletteSurface(in shape: some Shape, backgroundOpacity: CGFloat? = nil) -> some View {
+        modifier(PaletteSurface(shape: AnyShape(shape), backgroundOpacity: backgroundOpacity))
     }
 }

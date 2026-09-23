@@ -30,11 +30,11 @@ final class CalculatorCoordinator {
     /// History records the canonical answer; only what reaches the pasteboard is localized.
     private var format: CalcNumberFormat { core.calcNumberFormat }
 
-    /// Enter on the inline calculator card: copy the answer, remember the calculation, dismiss.
-    func copyCalculatorResult(_ result: CalcResult) {
+    /// Copy and record the inline answer; keyboard activation dismisses, while card clicks can stay.
+    func copyCalculatorResult(_ result: CalcResult, dismissPalette: Bool = true) {
         guard case .value(let display, let copyText) = result.payload else { return }
         calcHistory.record(expression: result.expression, result: display)
-        paletteCoordinator.hidePalette(restoreFocus: false)
+        if dismissPalette { paletteCoordinator.hidePalette(restoreFocus: false) }
         Paster.copyPlainText(format.localized(copyText))
     }
 

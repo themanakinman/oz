@@ -143,12 +143,6 @@ private struct NoteSwitcherRow: View {
     @State private var hovered = false
     @FocusState private var titleFocused: Bool
 
-    private var fill: Color {
-        if selected { return Theme.Colors.selection }
-        if hovered { return Theme.Colors.rowHover }
-        return .clear
-    }
-
     var body: some View {
         HStack(spacing: Theme.Spacing.lg) {
             SymbolImage(name: "text.page", size: Theme.Size.noteGlyph)
@@ -164,6 +158,7 @@ private struct NoteSwitcherRow: View {
                 Text(summary.displayTitle)
                     .font(Theme.Typography.rowTitle)
                     .lineLimit(1)
+                    .paletteResultText(isActive: selected || hovered)
             }
             Spacer(minLength: Theme.Spacing.md)
             if !editing, selected || hovered {
@@ -174,10 +169,6 @@ private struct NoteSwitcherRow: View {
         }
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.vertical, Theme.Spacing.sm)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
-                .fill(fill)
-        )
         .contentShape(Rectangle())
         .onTapGesture {
             guard !editing else { return }

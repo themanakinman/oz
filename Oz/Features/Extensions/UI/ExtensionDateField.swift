@@ -59,8 +59,7 @@ struct ExtensionDateField: View {
                         ExtensionPickerItem(value: $0.title, title: $0.title, detail: $0.detail)
                     },
                     selection: highlighted, chosen: [], assetsPath: nil,
-                    onSelect: { choose(rows, at: $0) },
-                    onHighlight: { highlighted = $0 })
+                    onSelect: { choose(rows, at: $0) })
             }
             .onKeyPress(phases: [.down, .repeat]) { press in
                 guard !palette.menuOpen, !ExtensionFormKey.enterKeys.contains(press.key)

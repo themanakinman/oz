@@ -256,6 +256,8 @@ screens hold (see [palette.md](palette.md)).
   call `List.Dropdown({…})` directly — so `ExtensionManager.accessoryValues` keys it by render-node id
   and `seedSearchBarAccessory` reports the opening choice through `onChange` on the first commit, as
   Raycast does; without that, a command filtering its rows by the value renders nothing (issue #511).
+  Hover brightens the row label without changing the keyboard selection; clicking chooses the
+  value, and the arrow keys move the selection used by Return.
   A `value` prop makes it controlled: the extension holds it, nothing is seeded, nothing reported.
   `storeValue` parks the pick in `ExtensionStorage.accessoryValues` — host UI state, outside the
   `LocalStorage` namespace JavaScript reads, and gone when the extension is uninstalled.
@@ -324,13 +326,14 @@ screens hold (see [palette.md](palette.md)).
   popover's search row renders the query rather than editing it, and every key — the arrows, ↵, ⎋,
   ⌫ and each typed character — is claimed on the control. `PaletteState.isControlListOpen` is what
   keeps the palette's own arrow and Escape handlers out of an open list; without it ↓ moved the
-  form's selection instead of the list's highlight.
+  form's selection instead of the list's selected item.
 
   **The list is hosted in a window of its own**, `ExtensionListPanel`, exactly as the ⌘K menu is by
   `MenuPanelController`. Glass samples what lies behind the window it is in, so a list drawn as an
   in-window overlay sampled the form and read as a different material however its fill was tuned.
-  With its own borderless child panel it samples the desktop, and a picker and the actions menu are
-  the same surface by construction rather than by matching. It keeps the panel's row pitch, icon
+  With its own borderless child panel it samples the desktop. The picker keeps its frosted control
+  surface; the ActionPanel uses the palette's shared scrim surface so it matches the footer capsule.
+  It keeps the panel's row pitch, icon
   slot and overflow fade; overflowing lists keep the native elastic boundary, while short lists do
   not bounce against empty space. Its menu symbols are 14pt Medium and monochrome unless the
   extension supplied a tint. A focused control takes the system accent edge that Settings and the
@@ -373,8 +376,9 @@ screens hold (see [palette.md](palette.md)).
 
   Every control carries its title as an accessibility label and its selection as a value, so a
   picker announces "Difficulty, Easy" rather than the chevron it is drawn with. It reads under the
-  pointer as well as the keyboard: controls lift on hover, a list's rows highlight under the mouse
-  so both share one selection, and clicking a control takes focus as well as acting, which is what
+  pointer as well as the keyboard: controls lift on hover, list hover is visual only, and clicking a
+  row chooses it without changing which row the arrow keys and Return currently target beforehand.
+  Clicking a control takes focus as well as acting, which is what
   lets the two be mixed mid-form.
 
   `Tests/ext-form-test.swift` drives activation rules, geometry and the parser; earlier interaction checks used
@@ -393,7 +397,8 @@ screens hold (see [palette.md](palette.md)).
   filters titles through the launcher's fuzzy matcher, preserves section boundaries and centres
   **No Results** in one row when empty; the scrolling edge beside that field has no dissolve. The
   8pt resting inset scrolls with the actions, so rows can reach the panel edge without shifting their
-  initial position; hover keeps the shared 10pt menu-row corner. The panel opens and closes from its
+  initial position; the active row uses the shared 10pt menu-row corner and pointer hover only
+  restores row-content opacity. Hover does not add a row fill or move keyboard selection. The panel opens and closes from its
   bottom-right attachment with extension-owned opacity and scale timing, briefly reaching 1.003;
   its attached corner matches the footer button. The first action is the primary ↵ action; an
   action's own `shortcut` is matched against modified keystrokes.

@@ -11,8 +11,12 @@ The command palette is a borderless floating `NSPanel` hosting SwiftUI; see
   frame change that starts elsewhere, and `windowDidMove` folds it back into the anchor so the
   controller stays the authority.
 - **The flat `selection` index must match the visible row order exactly**, including the inline
-  calculator card at index 0 when present. Selection is the single source of truth for highlight and
-  activation. `Features/PaletteRowIndex.swift` is that mapping and stays **Foundation-only and pure** —
+  calculator card at index 0 when present. Selection drives keyboard activation; row hover is a
+  separate visual emphasis and never changes the active index. Hover only restores row-content
+  opacity; it does not draw a row fill. The selected and hovered results stay at full opacity while
+  other results dim; the live calculator card remains unhighlighted.
+  Clicking a launcher result sets its index before activating it. `Features/PaletteRowIndex.swift` is that mapping and stays
+  **Foundation-only and pure** —
   no SwiftUI, no AppKit — so `palette-selection-test` compiles the shipped type rather than a copy.
   Section headers are not selectable and never consume an index.
 - **A menu owns native text input while it is open.** Its panel becomes key so the menu field gets an
@@ -220,8 +224,8 @@ field instead of the search field. A custom command has no screen of its own, so
 `argumentEntryID`, which lists that row alone in root search while the query is its name. Both are set
 **after** `showPalette`, since `prepare` clears them.
 
-The flat `selection` index is the single source of truth for highlight / activation and **must always
-match the visible row order**, including the card at index 0 when present — the calculator's (see
+The flat `selection` index drives keyboard activation and **must always match the visible row order**,
+including the card at index 0 when present — the calculator's (see
 [calculator.md](calculator.md)) or the meeting join card (see [calendar.md](calendar.md)), never both.
 
 ## Window placement

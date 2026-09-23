@@ -7,6 +7,7 @@ struct ChatTranscriptView: View {
     let messages: [ChatMessage]
     let status: AIThinkingStatus?
     let usage: AIUsage?
+    var onRerun: ((ChatMessage) -> Void)? = nil
     /// Whether replies should keep the transcript pinned to its end.
     @State private var followsTail = true
     /// Holds a newly sent prompt near the top until the reader scrolls elsewhere.
@@ -29,7 +30,8 @@ struct ChatTranscriptView: View {
                     ForEach(messages) { message in
                         ChatMessageView(
                             message: message,
-                            status: message.id == messages.last?.id ? status : nil
+                            status: message.id == messages.last?.id ? status : nil,
+                            onRerun: onRerun
                         )
                         .id(message.id)
                     }
@@ -143,13 +145,9 @@ private struct ResumeFollowingButton: View {
                 .foregroundStyle(Theme.Colors.textSecondary)
                 .padding(.horizontal, metrics.spacing.lg)
                 .padding(.vertical, metrics.spacing.sm)
-                .background(
-                    .ultraThinMaterial,
-                    in: RoundedRectangle(cornerRadius: metrics.radius.barControl, style: .continuous)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: metrics.radius.barControl, style: .continuous)
-                        .strokeBorder(Theme.Colors.border))
+                .padding(metrics.spacing.xs)
+                .paletteSurface(
+                    in: RoundedRectangle(cornerRadius: metrics.radius.barControl, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -160,6 +158,7 @@ private struct ChatMessageView: View {
     @Environment(\.metrics) private var metrics
     let message: ChatMessage
     let status: AIThinkingStatus?
+    let onRerun: ((ChatMessage) -> Void)?
 
     @State private var hovered = false
 
@@ -188,6 +187,9 @@ private struct ChatMessageView: View {
     private var footer: some View {
         HStack(spacing: metrics.spacing.sm) {
             if message.role == .user { timestamp }
+            if message.role == .user, let onRerun {
+                ChatRerunButton { onRerun(message) }
+            }
             ChatCopyButton(text: message.text)
             if message.role == .assistant { timestamp }
         }
@@ -213,13 +215,8 @@ private struct ChatMessageView: View {
                 .font(metrics.typography.rowTitle)
                 .foregroundStyle(message.state == .failed ? Theme.Colors.destructive : .primary)
                 .textSelection(.enabled)
-                // The user bubble is inset because it carries a fill; a reply clears the chevron
                 .padding(.horizontal, message.role == .user ? metrics.spacing.xl : metrics.spacing.sm)
                 .padding(.vertical, metrics.spacing.md)
-                .background(
-                    RoundedRectangle(cornerRadius: metrics.radius.row, style: .continuous)
-                        .fill(message.role == .user ? Theme.Colors.controlSurface : Color.clear)
-                )
         }
     }
 

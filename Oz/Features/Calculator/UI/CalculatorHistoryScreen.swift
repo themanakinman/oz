@@ -123,9 +123,10 @@ struct CalculatorHistoryScreen: PaletteScreen {
                 scroll: scroll,
                 calc: calc,
                 calcSelected: isCardSelected(selection),
-                onActivateCalc: {
+                onCopyCalc: {
+                    guard let calc else { return }
                     vm.selection = 0
-                    activate(at: 0)
+                    core.calculatorCoordinator.copyCalculatorResult(calc, dismissPalette: false)
                 },
                 onCalcActions: {
                     guard let calc, case .value = calc.payload else { return }

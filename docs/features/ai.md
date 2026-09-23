@@ -223,17 +223,21 @@ third way in. Settings → AI holds both the recorder and a checkbox for the com
 search; the shortcut keeps working while the command is hidden, and does nothing at all while the
 feature is off. The palette search field becomes the single-line composer. The footer pill and
 Return are one action, `activate`: Send, or Stop while a response streams — an empty composer sends
-nothing, so the pill never needs a disabled state. The header's trailing model switcher uses the
-same in-window menu control as Clipboard's type filter and changes the chat route for the next
-message. For installed routes and OpenRouter models whose catalog reports the capability, it also
+nothing, so the pill never needs a disabled state. Sending clears the composer and resets its shared
+AppKit field editor to the leading edge, including after a long prompt has scrolled horizontally. The
+header's trailing model switcher uses the same in-window menu control as Clipboard's type filter and
+changes the chat route for the next message. For installed routes and OpenRouter models whose
+catalog reports the capability, it also
 shows the supported reasoning efforts and changes the chat effort for the next message.
 Other API routes keep their provider default because their model catalogs expose no portable effort
 contract. Neither change interrupts a response already streaming; stopping one is the pill's job,
 so the header never has to fit a third control beside the switcher.
 
-The second footer control is the palette's normal Actions (`⌘K`) menu. It owns New Chat, Chat History
-and AI Settings, plus Stop Response and Copy Last Response when those actions apply. Chat adds no
-separate footer design and no independent window.
+The second footer control is the palette's normal Actions (`⌘K`) menu. New Chat is `⌘N`, Copy Last
+Response is `⌘⇧N`, and Chat History is `⌘⇧H`; the menu shows these shortcuts. AI Settings, Stop
+Response and Copy Last Response appear when they apply. Hovering a user message reveals a curved-arrow
+action that sends its text and attached media again as a new turn. Chat adds no separate footer
+design and no independent window.
 
 `AIChatState` turns provider-neutral stream events into one live assistant message. Thinking state is
 shown without entering the transcript, partial text is preserved on failure, cancellation invalidates

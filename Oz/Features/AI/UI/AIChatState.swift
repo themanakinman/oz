@@ -48,16 +48,18 @@ final class AIChatState {
     @discardableResult
     func send(
         _ input: String, using provider: any AIProvider, webSearch: Bool = false,
-        instructions: String? = nil, contextBudget: Int = ChatSession.defaultTextBudget
+        instructions: String? = nil, contextBudget: Int = ChatSession.defaultTextBudget,
+        replaying message: ChatMessage? = nil
     ) -> Bool {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty || !pendingAttachments.isEmpty, !isStreaming else { return false }
+        let images = message?.images ?? pendingAttachments.compactMap(\.image)
+        let documents = message?.documents ?? pendingAttachments.compactMap(\.document)
+        guard !text.isEmpty || !images.isEmpty || !documents.isEmpty, !isStreaming else {
+            return false
+        }
         notice = nil
-        session.append(
-            ChatMessage(
-                role: .user, text: text, images: pendingAttachments.compactMap(\.image),
-                documents: pendingAttachments.compactMap(\.document)))
-        clearStaging()
+        session.append(ChatMessage(role: .user, text: text, images: images, documents: documents))
+        if message == nil { clearStaging() }
         let request = AIRequest(
             instructions: instructions,
             messages: session.requestMessages(textBudget: contextBudget), webSearch: webSearch)

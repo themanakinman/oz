@@ -88,8 +88,7 @@ struct ExtensionPickerField: View {
             ) {
                 ExtensionPickerList(
                     items: matches, selection: highlighted, chosen: Set(chosen),
-                    assetsPath: assetsPath, onSelect: { choose(at: $0) },
-                    onHighlight: { highlighted = $0 })
+                    assetsPath: assetsPath, onSelect: { choose(at: $0) })
             }
             .onKeyPress(phases: [.down, .repeat]) { press in
                 guard !palette.menuOpen, !ExtensionFormKey.enterKeys.contains(press.key)

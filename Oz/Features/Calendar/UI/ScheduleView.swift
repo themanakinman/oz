@@ -82,12 +82,6 @@ private struct MeetingRow: View {
     let selected: Bool
     @State private var hovered = false
 
-    private var fill: Color {
-        if selected { return Theme.Colors.selection }
-        if hovered { return Theme.Colors.rowHover }
-        return .clear
-    }
-
     var body: some View {
         HStack(spacing: metrics.spacing.lg) {
             SymbolImage(
@@ -99,15 +93,12 @@ private struct MeetingRow: View {
             Text(meeting.title)
                 .font(metrics.typography.rowTitle)
                 .lineLimit(1)
+                .paletteResultText(isActive: selected || hovered)
             Spacer(minLength: metrics.spacing.md)
             MeetingTiming(meeting: meeting, now: now)
         }
         .padding(.horizontal, metrics.spacing.md)
         .padding(.vertical, metrics.spacing.sm)
-        .background(
-            RoundedRectangle(cornerRadius: metrics.radius.row, style: .continuous)
-                .fill(fill)
-        )
         .armedHover($hovered)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityText)

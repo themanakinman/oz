@@ -36,11 +36,11 @@ struct LauncherScreen: PaletteScreen {
     private let fallbacks: [(fallback: Fallback, entry: AppEntry)]
     /// Resolved in `init`: the palette indexes this several times per event, so it can't recompute.
     let rows: [Row]
-    /// The calculator card occupies five normal row-heights in the launcher panel.
+    /// The calculator card occupies two and a half normal row-heights in the launcher panel.
     var viewportRowCount: CGFloat {
         let contentRows =
             rows.first.map { if case .calc = $0 { true } else { false } } == true
-            ? CGFloat(rows.count - 1 + Theme.Size.launcherCalculatorCardRows) : CGFloat(rows.count)
+            ? CGFloat(rows.count - 1) + Theme.Size.launcherCalculatorCardRows : CGFloat(rows.count)
         return contentRows - (fallbacks.isEmpty ? 0 : 0.5)
     }
     /// Every home section is a shortlist; the dedicated search screens remain the full browsers.
@@ -488,6 +488,11 @@ struct LauncherScreen: PaletteScreen {
             onActivateCard: {
                 vm.selection = 0
                 activate(at: 0)
+            },
+            onCopyCard: {
+                guard let calc else { return }
+                vm.selection = 0
+                core.calculatorCoordinator.copyCalculatorResult(calc, dismissPalette: false)
             },
             onCardActions: {
                 guard hasPrimaryAction(at: 0) else { return }

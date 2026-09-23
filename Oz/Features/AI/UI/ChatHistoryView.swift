@@ -89,12 +89,6 @@ private struct ChatHistoryRow: View {
     let selected: Bool
     @State private var hovered = false
 
-    private var fill: Color {
-        if selected { return Theme.Colors.selection }
-        if hovered { return Theme.Colors.rowHover }
-        return .clear
-    }
-
     var body: some View {
         HStack(spacing: metrics.spacing.lg) {
             RoundedRectangle(cornerRadius: metrics.radius.thumbnail, style: .continuous)
@@ -109,6 +103,7 @@ private struct ChatHistoryRow: View {
                 Text(conversation.title)
                     .font(metrics.typography.rowTitle)
                     .lineLimit(1)
+                    .paletteResultText(isActive: selected || hovered)
                 if !conversation.preview.isEmpty {
                     Text(conversation.preview)
                         .font(metrics.typography.keyCap)
@@ -123,9 +118,6 @@ private struct ChatHistoryRow: View {
         }
         .padding(.horizontal, metrics.spacing.md)
         .padding(.vertical, metrics.spacing.sm)
-        .background(
-            RoundedRectangle(cornerRadius: metrics.radius.row, style: .continuous).fill(fill)
-        )
         .armedHover($hovered)
     }
 }

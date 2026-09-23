@@ -106,9 +106,6 @@ struct FileSearchScreen: PaletteScreen {
                     }
                 )
                 .frame(width: metrics.size.clipboardListWidth)
-                Rectangle()
-                    .fill(Theme.Colors.separator)
-                    .frame(width: Theme.Size.hairline)
                 FileSearchPreview(result: selected)
             }
             .overlay {

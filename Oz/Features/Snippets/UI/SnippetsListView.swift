@@ -53,12 +53,6 @@ private struct SnippetRow: View {
     let selected: Bool
     @State private var hovered = false
 
-    private var fill: Color {
-        if selected { return Theme.Colors.selection }
-        if hovered { return Theme.Colors.rowHover }
-        return .clear
-    }
-
     var body: some View {
         HStack(spacing: metrics.spacing.lg) {
             RoundedRectangle(cornerRadius: metrics.radius.thumbnail, style: .continuous)
@@ -72,6 +66,7 @@ private struct SnippetRow: View {
             Text(record.snippet.name)
                 .font(metrics.typography.rowTitle)
                 .lineLimit(1)
+                .paletteResultText(isActive: selected || hovered)
             Spacer(minLength: metrics.spacing.lg)
             if let keyword = record.snippet.keyword, !keyword.isEmpty {
                 Text(keyword)
@@ -82,9 +77,6 @@ private struct SnippetRow: View {
         }
         .padding(.horizontal, metrics.spacing.md)
         .padding(.vertical, metrics.spacing.sm)
-        .background(
-            RoundedRectangle(cornerRadius: metrics.radius.row, style: .continuous).fill(fill)
-        )
         .armedHover($hovered)
     }
 }
@@ -142,7 +134,6 @@ private struct SnippetInfoSection: View {
             VStack(spacing: 0) {
                 let rows = self.rows
                 ForEach(rows) { row in
-                    if row.id != rows.first?.id { Divider() }
                     HStack(spacing: metrics.spacing.sm) {
                         Text(row.label).foregroundStyle(.secondary)
                         Spacer(minLength: metrics.spacing.lg)

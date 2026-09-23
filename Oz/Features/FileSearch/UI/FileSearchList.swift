@@ -22,7 +22,9 @@ struct FileSearchList: View {
                 LazyVStack(spacing: 0) {
                     SectionHeader(title: title, isFirst: true)
                     ForEach(results) { result in
-                        FileSearchRow(result: result, selected: result.id == selectedID)
+                        FileSearchRow(
+                            result: result, selected: result.id == selectedID,
+                            showsPathMetadata: false)
                             .selectionFrame(result.id == selectedID)
                             .contentShape(Rectangle())
                             .onRowClick(
@@ -55,8 +57,9 @@ struct FileSearchRow: View {
     let selected: Bool
     /// The root search lends its ⌘1…⌘0 hints; the dedicated screen has none to show.
     var resultIndex: Int? = nil
-    /// Root launcher results dim until selected or hovered; full File Search keeps its row styling.
-    var dimWhenUnselected = false
+    var showsPathMetadata = true
+    /// Unselected files dim in every result list, matching the launcher and other palette modes.
+    var dimWhenUnselected = true
     var onActivateFromDragHandle: (() -> Void)?
     @Environment(PaletteState.self) private var palette
     @State private var image: NSImage?
@@ -64,26 +67,16 @@ struct FileSearchRow: View {
 
     init(
         result: FileSearchResult, selected: Bool, resultIndex: Int? = nil,
-        dimWhenUnselected: Bool = false,
+        showsPathMetadata: Bool = true, dimWhenUnselected: Bool = true,
         onActivateFromDragHandle: (() -> Void)? = nil
     ) {
         self.result = result
         self.selected = selected
         self.resultIndex = resultIndex
+        self.showsPathMetadata = showsPathMetadata
         self.dimWhenUnselected = dimWhenUnselected
         self.onActivateFromDragHandle = onActivateFromDragHandle
         _image = State(initialValue: IconCache.cachedFitted(forFile: result.id))
-    }
-
-    private var fill: Color {
-        if dimWhenUnselected { return .clear }
-        if selected { return Theme.Colors.selection }
-        if hovered { return Theme.Colors.rowHover }
-        return .clear
-    }
-
-    private var contentOpacity: Double {
-        !dimWhenUnselected || selected || hovered ? 1 : 0.38
     }
 
     /// A folder is named by where it sits: half the hits are some `src` or `Oz`.
@@ -117,7 +110,8 @@ struct FileSearchRow: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .layoutPriority(1)
-                if !result.isDirectory, !pathMetadata.isEmpty {
+                    .paletteResultText(isActive: !dimWhenUnselected || selected || hovered)
+                if showsPathMetadata, !result.isDirectory, !pathMetadata.isEmpty {
                     Text(pathMetadata)
                         .font(metrics.typography.rowTrailing)
                         .foregroundStyle(Theme.Colors.textTertiary)
@@ -143,14 +137,7 @@ struct FileSearchRow: View {
         .animation(.easeOut(duration: 0.12), value: palette.commandHeld)
         .padding(.horizontal, metrics.spacing.md)
         .padding(.vertical, metrics.spacing.sm)
-        .background(
-            RoundedRectangle(cornerRadius: metrics.radius.row, style: .continuous)
-                .fill(fill)
-        )
-        .opacity(contentOpacity)
-        .armedHover($hovered) {
-            if dimWhenUnselected, let resultIndex { palette.selection = resultIndex }
-        }
+        .armedHover($hovered)
         .overlay {
             if let onActivateFromDragHandle {
                 FileSearchDragHandle(
@@ -159,9 +146,6 @@ struct FileSearchRow: View {
                     onHoverChanged: { inside in
                         let isArmed = inside && palette.hoverHighlightArmed
                         hovered = isArmed
-                        if isArmed, dimWhenUnselected, let resultIndex {
-                            palette.selection = resultIndex
-                        }
                     }
                 )
             }

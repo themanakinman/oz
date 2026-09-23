@@ -17,6 +17,7 @@ struct LauncherList: View {
     var card: LeadCard?
     var cardSelected = false
     var onActivateCard: () -> Void = {}
+    var onCopyCard: () -> Void = {}
     var onCardActions: () -> Void = {}
     let onActivate: (AppEntry) -> Void
     let onActions: (AppEntry) -> Void
@@ -178,9 +179,10 @@ struct LauncherList: View {
                                         configure: fallbacks?.onConfigure,
                                         configureHelp: "Configure Fallbacks…")
                                 case .card(let card):
-                                    LeadCardView(card: card, selected: cardSelected)
+                                    LeadCardView(
+                                        card: card, selected: cardSelected,
+                                        onActivate: onActivateCard, onCopy: onCopyCard)
                                         .contentShape(Rectangle())
-                                        .onTapGesture(perform: onActivateCard)
                                         .onRightClick(perform: onCardActions)
                                         .padding(.bottom, metrics.spacing.xs)
                                         .selectionFrame(cardSelected)
@@ -192,7 +194,10 @@ struct LauncherList: View {
                                         selectionIndex: resultIndex ?? 0
                                     )
                                     .contentShape(Rectangle())
-                                    .onTapGesture { onActivate(app) }
+                                    .onTapGesture {
+                                        palette.selection = resultIndex ?? 0
+                                        onActivate(app)
+                                    }
                                     .onRightClick { onActions(app) }
                                     .selectionFrame(app.id == selectedRowID)
                                 case .file(let result, let resultIndex):
@@ -200,7 +205,10 @@ struct LauncherList: View {
                                         result: result, selected: row.id == selectedRowID,
                                         resultIndex: resultIndex,
                                         dimWhenUnselected: true,
-                                        onActivateFromDragHandle: { onActivateFile(result) }
+                                        onActivateFromDragHandle: {
+                                            if let resultIndex { palette.selection = resultIndex }
+                                            onActivateFile(result)
+                                        }
                                     )
                                     .contentShape(Rectangle())
                                     .onRightClick { onFileActions(result) }
@@ -214,7 +222,10 @@ struct LauncherList: View {
                                         selectionIndex: resultIndex
                                     )
                                     .contentShape(Rectangle())
-                                    .onTapGesture { fallbacks?.onActivate(index) }
+                                    .onTapGesture {
+                                        palette.selection = resultIndex
+                                        fallbacks?.onActivate(index)
+                                    }
                                     .onRightClick { fallbacks?.onActions(index) }
                                     .selectionFrame(row.id == selectedRowID)
                                 }
@@ -242,15 +253,19 @@ struct LauncherList: View {
 private struct LeadCardView: View {
     let card: LauncherList.LeadCard
     let selected: Bool
+    let onActivate: () -> Void
+    let onCopy: () -> Void
 
     var body: some View {
         switch card {
         case .calc(let result):
-            CalculatorCard(result: result, selected: selected)
+            CalculatorCard(result: result, onCopy: onCopy)
         case .meeting(let meeting, let now):
             MeetingCard(meeting: meeting, now: now, selected: selected)
+                .onTapGesture(perform: onActivate)
         case .color(let color):
             ColorCard(color: color, selected: selected)
+                .onTapGesture(perform: onActivate)
         }
     }
 }
@@ -269,8 +284,6 @@ private struct AppRow: View {
     @Environment(AliasStore.self) private var aliases
     @Environment(PaletteState.self) private var palette
     @State private var hovered = false
-
-    private var contentOpacity: Double { selected || hovered ? 1 : 0.38 }
 
     /// Keycaps for this entry's hotkey, or `nil` if none is bound.
     private var shortcutCaps: [String]? {
@@ -298,6 +311,7 @@ private struct AppRow: View {
             Text(app.name)
                 .font(metrics.typography.rowTitle)
                 .lineLimit(1)
+                .paletteResultText(isActive: selected || hovered)
             if let subtitle = app.subtitle {
                 Text(subtitle)
                     .font(metrics.typography.rowTrailing)
@@ -346,8 +360,7 @@ private struct AppRow: View {
         .animation(.easeOut(duration: 0.12), value: palette.commandHeld)
         .padding(.horizontal, metrics.spacing.md)
         .padding(.vertical, metrics.spacing.sm)
-        .opacity(contentOpacity)
-        .armedHover($hovered) { palette.selection = selectionIndex }
+        .armedHover($hovered)
     }
 }
 

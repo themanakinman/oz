@@ -91,13 +91,6 @@ private struct QuicklinkRow: View {
     @Environment(HotKeyManager.self) private var hotKeys
     @State private var hovered = false
 
-    /// Selection wins over hover when a row is both; otherwise hover shows its fainter layer.
-    private var fill: Color {
-        if selected { return Theme.Colors.selection }
-        if hovered { return Theme.Colors.rowHover }
-        return .clear
-    }
-
     var body: some View {
         HStack(spacing: metrics.spacing.lg) {
             QuicklinkIconView(
@@ -107,6 +100,7 @@ private struct QuicklinkRow: View {
                 Text(quicklink.name)
                     .font(metrics.typography.rowTitle)
                     .lineLimit(1)
+                    .paletteResultText(isActive: selected || hovered)
                 Text(quicklink.link)
                     .font(metrics.typography.rowTrailing)
                     .foregroundStyle(Theme.Colors.textTertiary)
@@ -129,10 +123,6 @@ private struct QuicklinkRow: View {
         }
         .padding(.horizontal, metrics.spacing.md)
         .padding(.vertical, metrics.spacing.sm)
-        .background(
-            RoundedRectangle(cornerRadius: metrics.radius.row, style: .continuous)
-                .fill(fill)
-        )
         .armedHover($hovered)
     }
 }
@@ -214,7 +204,6 @@ private struct QuicklinkInfoSection: View {
             VStack(spacing: 0) {
                 let rows = self.rows
                 ForEach(rows) { row in
-                    if row.id != rows.first?.id { Divider() }
                     HStack(spacing: metrics.spacing.sm) {
                         Text(row.label).foregroundStyle(.secondary)
                         Spacer(minLength: metrics.spacing.lg)

@@ -8,12 +8,15 @@ struct ClipDragHandle: NSViewRepresentable {
     var onSelect: () -> Void
     var onActivate: () -> Void
     var onDropped: () -> Void
+    var onHoverChanged: (Bool) -> Void
 
     func makeNSView(context: Context) -> NSView { ClipDragView() }
 
     func updateNSView(_ nsView: NSView, context: Context) {
         (nsView as? ClipDragView)?
-            .bind(payload: payload, onSelect: onSelect, onActivate: onActivate, onDropped: onDropped)
+            .bind(
+                payload: payload, onSelect: onSelect, onActivate: onActivate,
+                onDropped: onDropped, onHoverChanged: onHoverChanged)
     }
 }
 
@@ -23,11 +26,13 @@ extension View {
         payload: @escaping () -> ClipDragPayload?,
         onSelect: @escaping () -> Void,
         onActivate: @escaping () -> Void,
-        onDropped: @escaping () -> Void
+        onDropped: @escaping () -> Void,
+        onHoverChanged: @escaping (Bool) -> Void
     ) -> some View {
         overlay {
             ClipDragHandle(
-                payload: payload, onSelect: onSelect, onActivate: onActivate, onDropped: onDropped)
+                payload: payload, onSelect: onSelect, onActivate: onActivate, onDropped: onDropped,
+                onHoverChanged: onHoverChanged)
         }
     }
 }
@@ -41,15 +46,43 @@ private final class ClipDragView: NSView, NSDraggingSource {
     private var onSelect: (() -> Void)?
     private var onActivate: (() -> Void)?
     private var onDropped: (() -> Void)?
+    private var onHoverChanged: ((Bool) -> Void)?
 
     func bind(
         payload: @escaping () -> ClipDragPayload?, onSelect: @escaping () -> Void,
-        onActivate: @escaping () -> Void, onDropped: @escaping () -> Void
+        onActivate: @escaping () -> Void, onDropped: @escaping () -> Void,
+        onHoverChanged: @escaping (Bool) -> Void
     ) {
         self.payload = payload
         self.onSelect = onSelect
         self.onActivate = onActivate
         self.onDropped = onDropped
+        self.onHoverChanged = onHoverChanged
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(
+            NSTrackingArea(
+                rect: .zero,
+                options: [.mouseEnteredAndExited, .mouseMoved, .activeInKeyWindow, .inVisibleRect],
+                owner: self,
+                userInfo: nil
+            )
+        )
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        onHoverChanged?(true)
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        onHoverChanged?(true)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        onHoverChanged?(false)
     }
 
     /// Left button only, so the row's right-click catcher underneath still opens the actions menu.

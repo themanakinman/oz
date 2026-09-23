@@ -47,7 +47,7 @@ enum PaletteMode: String, CaseIterable, Identifiable {
         case .aiHistory: return "Search chats…"
         case .calculatorHistory: return "Do math, convert units, or search your past calculations…"
         case .emoji: return "Search emoji and symbols…"
-        case .fileSearch: return "Search files and folders…"
+        case .fileSearch: return ""
         case .menuSearch: return "Search menu bar items…"
         case .switchWindows: return "Search open windows…"
         case .schedule: return "Search your schedule…"

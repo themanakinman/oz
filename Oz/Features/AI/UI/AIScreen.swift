@@ -26,12 +26,14 @@ struct AIScreen: PaletteScreen {
                 })
         }
         items.append(
-            PopoverMenuItem(title: "New Chat", systemImage: "plus.bubble") {
+            PopoverMenuItem(title: "New Chat", systemImage: "plus.bubble", shortcut: "⌘N") {
                 coordinator.startNewChat()
             })
         if chat.lastAssistantText != nil {
             items.append(
-                PopoverMenuItem(title: "Copy Last Response", systemImage: "doc.on.doc", startsSection: true) {
+                PopoverMenuItem(
+                    title: "Copy Last Response", systemImage: "doc.on.doc", startsSection: true,
+                    shortcut: "⌘⇧N") {
                     coordinator.copyLastResponse()
                 })
         }
@@ -46,7 +48,8 @@ struct AIScreen: PaletteScreen {
         }
         items.append(
             PopoverMenuItem(
-                title: "Chat History", systemImage: "clock.arrow.circlepath", startsSection: true
+                title: "Chat History", systemImage: "clock.arrow.circlepath", startsSection: true,
+                shortcut: "⇧⌘H"
             ) {
                 coordinator.showHistory()
             })
@@ -63,10 +66,17 @@ struct AIScreen: PaletteScreen {
             coordinator.stopResponse()
         } else if coordinator.send(vm.query) {
             vm.query = ""
+            vm.resetSearchCaretToBeginning()
         }
     }
 
     func secondary(at selection: Int) -> Bool { false }
+
+    func perform(_ shortcut: PaletteShortcut, at selection: Int) -> Bool {
+        guard shortcut == .hideFromSearch else { return false }
+        coordinator.showHistory()
+        return true
+    }
 
     func headerAccessory(
         at selection: Int, focus: FocusState<String?>.Binding
@@ -95,7 +105,8 @@ struct AIScreen: PaletteScreen {
         AnyView(
             AIChatView(
                 chat: chat, settings: settings, availability: coordinator.availability,
-                onConfigure: coordinator.showSettings, onAppear: coordinator.prepareForChat))
+                onConfigure: coordinator.showSettings, onAppear: coordinator.prepareForChat,
+                onRerun: coordinator.rerun))
     }
 }
 
@@ -105,6 +116,7 @@ private struct AIChatView: View {
     let availability: () -> String?
     let onConfigure: () -> Void
     let onAppear: () -> Void
+    let onRerun: (ChatMessage) -> Void
     @State private var unavailability: String?
 
     var body: some View {
@@ -118,7 +130,8 @@ private struct AIChatView: View {
                 ChatTranscriptView(
                     messages: chat.session.messages,
                     status: chat.liveStatus,
-                    usage: chat.usage)
+                    usage: chat.usage,
+                    onRerun: chat.isStreaming ? nil : onRerun)
             }
         }
         .onAppear {
@@ -132,6 +145,16 @@ private struct AIChatView: View {
 private struct AIEmptyState: View {
 
     @Environment(\.metrics) private var metrics
+    private static let greetings = [
+        "What's on your mind, Jhenè?",
+        "Ask away, Jhenè.",
+        "Question? Ask.",
+        "Yo, ask anything.",
+        "Jhenè, we meet again.",
+        "Hey Jhenè, what's up?",
+        "Your turn, ask something."
+    ]
+    @State private var greeting = Self.greetings.randomElement() ?? Self.greetings[0]
     let message: String?
     let canConfigure: Bool
     let onConfigure: () -> Void
@@ -142,7 +165,7 @@ private struct AIEmptyState: View {
                 .font(.largeTitle)
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(.tertiary)
-            Text("Ask anything")
+            Text(greeting)
                 .foregroundStyle(.secondary)
             if let message {
                 Text(message)
@@ -150,16 +173,6 @@ private struct AIEmptyState: View {
                     .foregroundStyle(Theme.Colors.textTertiary)
                     .multilineTextAlignment(.center)
                 if canConfigure { Button("Configure AI", action: onConfigure) }
-            } else {
-                HStack(spacing: metrics.spacing.sm) {
-                    Text("View history")
-                    HStack(spacing: metrics.spacing.xxs) {
-                        KeyCapChip(text: "⌘", style: .plain)
-                        KeyCapChip(text: "H", style: .plain)
-                    }
-                }
-                .font(metrics.typography.rowTrailing)
-                .foregroundStyle(Theme.Colors.textTertiary)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

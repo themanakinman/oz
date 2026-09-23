@@ -111,12 +111,9 @@ struct PopoverMenu: View {
     var attachment = Attachment.none
     let search: Search
 
-    /// The palette arms this only once the pointer has moved of its own accord.
     @Environment(PaletteState.self) private var palette
     @Environment(\.metrics) private var metrics
     @FocusState private var searchFocused: Bool
-    /// Set by the pointer so the reveal can tell its own move from a keyboard one.
-    @State private var pointerSelection: Int?
 
     private var listInset: CGFloat { metrics.spacing.md }
     var body: some View {
@@ -125,7 +122,7 @@ struct PopoverMenu: View {
             attachedRadius: metrics.radius.menuAttachment)
         surfaceContent
             .frame(width: width ?? metrics.size.actionMenuWidth)
-            .glassEffect(.regular, in: shape)
+            .paletteSurface(in: shape, backgroundOpacity: 0.9)
     }
 
     private var surfaceContent: some View {
@@ -233,7 +230,6 @@ struct PopoverMenu: View {
                                     onActivate(index)
                                 }
                             }
-                            .onContinuousHover { if case .active = $0 { hover(index) } }
                         }
                         .id(index)
                     }
@@ -247,12 +243,7 @@ struct PopoverMenu: View {
             // The hosting view outlives a presentation, so a fresh one must not inherit the offset.
             .id(palette.menuPresentationToken)
             .onAppear { proxy.scrollTo(selection, anchor: .center) }
-            .onChange(of: selection) {
-                let byPointer = pointerSelection == selection
-                pointerSelection = nil
-                guard !byPointer else { return }
-                proxy.scrollTo(selection)
-            }
+            .onChange(of: selection) { proxy.scrollTo(selection) }
         }
     }
 
@@ -317,22 +308,15 @@ struct PopoverMenu: View {
             .padding(.bottom, metrics.spacing.xxs)
     }
 
-    /// Armed only once the pointer has moved of its own accord, so a scroll past it lights nothing.
-    private func hover(_ index: Int) {
-        guard palette.hoverHighlightArmed, items[index].isSelectable, index != selection else {
-            return
-        }
-        pointerSelection = index
-        selection = index
-    }
 }
 
-/// One menu row; highlight is selection-driven, so only one row is ever active.
+/// Keyboard selection and deliberate hover brighten only their own row label.
 private struct PopoverMenuRow: View {
     let item: PopoverMenuItem
     let selected: Bool
     let onActivate: () -> Void
     @Environment(\.metrics) private var metrics
+    @State private var hovered = false
 
     var body: some View {
         Button(action: onActivate) {
@@ -372,6 +356,7 @@ private struct PopoverMenuRow: View {
                     .font(metrics.typography.menuRow)
                     .foregroundStyle(item.isDestructive ? Color.red : Color.primary)
                     .lineLimit(1)
+                    .paletteResultText(isActive: selected || hovered)
                 Spacer(minLength: metrics.spacing.sm)
                 if let detail = item.detail {
                     Text(detail)
@@ -397,14 +382,11 @@ private struct PopoverMenuRow: View {
                 maxHeight: metrics.size.menuRowHeight, alignment: .leading
             )
             .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: metrics.radius.menuRow, style: .continuous)
-                    .fill(selected ? Theme.Colors.menuHover : Color.clear)
-            )
             .opacity(item.isEnabled ? 1 : 0.45)
         }
         .buttonStyle(.plain)
         .disabled(!item.isSelectable)
+        .armedHover($hovered, enabled: item.isSelectable)
     }
 }
 

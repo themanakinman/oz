@@ -33,30 +33,37 @@ enum CalcMemo {
     }
 }
 
-/// The inline answer card above the app results; selectable like a row, Enter copies.
+/// The inline answer above the app results; Return copies while the launcher keeps it selected.
 struct CalculatorCard: View {
     @Environment(\.metrics) private var metrics
     @Environment(AppCore.self) private var core
     let result: CalcResult
-    let selected: Bool
+    let onCopy: () -> Void
+    @State private var copiedAt: Date?
 
     var body: some View {
         let result = core.calcNumberFormat.localized(result)
-        return Group {
+        let rowHeight = metrics.size.rowIcon + metrics.spacing.sm * 2
+        return VStack(spacing: metrics.spacing.md) {
             switch result.payload {
             case .value(let display, _):
-                HStack(spacing: 0) {
-                    LeadCardColumn(
-                        text: CalcSyntax.highlighted(result.expression),
-                        badge: result.sourceBadge, badgeHasBackground: false)
-                    Image(systemName: "arrow.right")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                    LeadCardColumn(
-                        text: CalcSyntax.highlighted(display), badge: result.targetBadge,
-                        weight: .semibold, badgeHasBackground: false)
+                Text(CalcSyntax.highlighted(display))
+                    .font(metrics.typography.calcResult.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                HStack(spacing: metrics.spacing.xs) {
+                    Text("Result")
+                    Image(systemName: copiedAt == nil ? "doc.on.doc" : "checkmark")
+                        .foregroundStyle(
+                            copiedAt == nil ? Theme.Colors.textSecondary : Theme.Colors.success)
+                        .contentTransition(.symbolEffect(.replace))
                 }
-                .fixedSize(horizontal: false, vertical: true)
+                .font(metrics.typography.keyCap)
+                .foregroundStyle(Theme.Colors.textSecondary)
+                .animation(.easeOut(duration: 0.16), value: copiedAt != nil)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(
+                    copiedAt == nil ? "Result, click or press Return to copy" : "Copied")
             case .error(let message):
                 HStack(spacing: metrics.spacing.md) {
                     Image(systemName: "exclamationmark.triangle")
@@ -70,8 +77,25 @@ struct CalculatorCard: View {
             }
         }
         .padding(.horizontal, metrics.spacing.xl)
-        .padding(.vertical, metrics.spacing.xxxl)
-        .leadCard(selected: selected, baseFill: .clear)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: rowHeight * Theme.Size.launcherCalculatorCardRows)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard case .value = result.payload else { return }
+            onCopy()
+            copiedAt = Date()
+        }
+        .task(id: copiedAt) {
+            guard copiedAt != nil else { return }
+            do {
+                try await Task.sleep(for: .seconds(Theme.Duration.copyFeedback))
+            } catch {
+                return
+            }
+            copiedAt = nil
+        }
+        .onChange(of: result.expression) { _, _ in copiedAt = nil }
     }
 }
 

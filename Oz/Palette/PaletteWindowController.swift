@@ -98,9 +98,12 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
     }
 
     /// The character a bare-⌘ chord names, through the ASCII layout so an IME cannot move it.
-    private static func commandCharacter(from event: NSEvent) -> String? {
+    private static func commandCharacter(
+        from event: NSEvent, allowingShift: Bool = false
+    ) -> String? {
+        let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
         guard !event.isARepeat,
-            event.modifierFlags.intersection([.command, .option, .control, .shift]) == .command
+            modifiers == .command || (allowingShift && modifiers == [.command, .shift])
         else { return nil }
         return ASCIIKeyboardLayout.character(for: event)?.lowercased()
             ?? event.charactersIgnoringModifiers?.lowercased()
@@ -354,6 +357,25 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
                 self.core.palette.noteEmojiGridZoom(zoom)
                 return true
             }
+            if self.core.palette.mode == .ai,
+                let character = Self.commandCharacter(from: event, allowingShift: true)
+            {
+                let isShifted =
+                    event.modifierFlags.intersection([.command, .option, .control, .shift])
+                    == [.command, .shift]
+                switch (character, isShifted) {
+                case ("n", false):
+                    self.core.aiChatCoordinator.startNewChat()
+                    return true
+                case ("n", true):
+                    return self.core.aiChatCoordinator.copyLastResponse()
+                case ("h", true):
+                    self.core.aiChatCoordinator.showHistory()
+                    return true
+                default:
+                    break
+                }
+            }
             guard Self.commandCharacter(from: event) != nil else { return false }
             if self.core.palette.mode == .launcher || self.core.palette.mode == .clipboard,
                 let index = PaletteState.resultIndex(forKeyCode: event.keyCode)
@@ -362,10 +384,6 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
                 return true
             }
             guard let character = Self.commandCharacter(from: event) else { return false }
-            if self.core.palette.mode == .ai, character == "h" {
-                self.core.aiChatCoordinator.showHistory()
-                return true
-            }
             switch character {
             case ",":
                 self.core.settingsCoordinator.showSettings()

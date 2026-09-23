@@ -356,11 +356,16 @@ Nothing ever autoplays — arrow-keying a list of twenty videos must not start t
 player view is `KeyboardFocusRefusing`, so clicking its transport leaves the caret in the search
 field; see [palette.md](palette.md#the-keyboard-belongs-to-the-search-field).
 
+The whole right preview column scrolls together, including its Information rows, so a tall image or
+file preview cannot push that metadata out of reach. Text selection stays enabled inside the
+scrolling preview. Its content carries a footer-height bottom inset so the last row can scroll clear
+of the fixed action bar.
+
 **`clipboardMediaHeight` is a cap, not a height.** As a fixed `frame(height:)` the player asked for
 260 pt whatever the pane had: with the Information block's 175 pt beneath it the column wanted 435 pt
 of a 359 pt content area, and the overflow pushed the bottom bar out and the panel taller. Every other
-preview kind already shrinks — an image scales to fit, text scrolls — so the player does too, and only
-its maximum is a token.
+preview kind already shrinks — an image scales to fit and the preview column scrolls — so the player
+does too, and only its maximum is a token.
 
 **A backup carries the path, never the bytes.** `BackupClipboardItem.file` exports `text` and no
 blob, a file already gone at export time is counted missing, and a restore drops a row whose path

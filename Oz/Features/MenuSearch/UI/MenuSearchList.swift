@@ -99,12 +99,6 @@ private struct MenuSearchRow: View {
     let selected: Bool
     @State private var hovered = false
 
-    private var fill: Color {
-        if selected { return Theme.Colors.selection }
-        if hovered { return Theme.Colors.rowHover }
-        return .clear
-    }
-
     var body: some View {
         HStack(spacing: metrics.spacing.lg) {
             Group {
@@ -120,6 +114,7 @@ private struct MenuSearchRow: View {
                 .font(metrics.typography.rowTitle)
                 .lineLimit(1)
                 .layoutPriority(1)
+                .paletteResultText(isActive: selected || hovered)
             if !path.isEmpty {
                 Text(path)
                     .font(metrics.typography.rowTrailing)
@@ -139,10 +134,6 @@ private struct MenuSearchRow: View {
         }
         .padding(.horizontal, metrics.spacing.md)
         .padding(.vertical, metrics.spacing.sm)
-        .background(
-            RoundedRectangle(cornerRadius: metrics.radius.row, style: .continuous)
-                .fill(fill)
-        )
         .armedHover($hovered)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(item.title)

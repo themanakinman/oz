@@ -3,6 +3,7 @@ import SwiftUI
 /// The join card above the launcher results; selectable like a row, Enter joins.
 struct MeetingCard: View {
     @Environment(\.metrics) private var metrics
+    @Environment(\.leadCardResultActive) private var resultActive
     let meeting: MeetingEvent
     let now: Date
     let selected: Bool
@@ -19,6 +20,7 @@ struct MeetingCard: View {
                     .font(metrics.typography.calcResult.weight(.semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
+                    .paletteResultText(isActive: resultActive)
                 HStack(spacing: metrics.spacing.sm) {
                     if let tint = meeting.calendarColor { ColorDot(color: tint.color) }
                     Text(subtitle)

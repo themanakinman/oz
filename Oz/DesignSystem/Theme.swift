@@ -33,7 +33,7 @@ enum Theme {
         /// Emoji tiles are roomier than list rows, so their corners take one larger step.
         static let emojiCell: CGFloat = 12
         static let menu: CGFloat = 6
-        /// Hover highlight behind a popover menu row.
+        /// Selection fill behind a popover menu row.
         static let menuRow: CGFloat = 10
         /// A header pop-up button; the footer's action pills stay capsules.
         static let barControl: CGFloat = 8
@@ -66,8 +66,8 @@ enum Theme {
         static let launcherVisibleRows = 9
         /// Maximum launcher height: nine rows plus the header, footer and section breathing room.
         static let launcherPanelHeight: CGFloat = 466
-        /// A calculator card is taller than a standard result, so size its viewport as five rows.
-        static let launcherCalculatorCardRows = 5
+        /// The calculator card is half its former five-row height, including in launcher sizing.
+        static let launcherCalculatorCardRows: CGFloat = 2.5
         /// Opening size on a first run and the floor: below it the title bar's own parts collide.
         static let noteWindow = CGSize(width: 440, height: 180)
         static let noteEditorInset: CGFloat = 16
@@ -376,6 +376,11 @@ enum Theme {
                 dark: .srgbInk(0, alpha: alpha(0.40)), light: .srgbInk(1, alpha: alpha(0.55)))
         }
 
+        /// Action submenus keep their surface readable over result text behind the menu.
+        static func submenuSurface(opacity: CGFloat) -> Color {
+            adaptive(dark: .srgbInk(0, alpha: opacity), light: .srgbInk(1, alpha: opacity))
+        }
+
         static func panelEdgeHighlight(transparency: Int) -> Color {
             let amount = Double(max(-100, min(100, transparency))) / 100
             let dark = amount > 0 ? 0.58 - amount * 0.20 : -amount * 0.04
@@ -390,19 +395,12 @@ enum Theme {
                 startPoint: .top, endPoint: .bottom)
         }
 
-        /// Selection fill, shared by every list so they look identical.
+        /// Selection fill for controls and text selection.
         static let selection = ramp(dark: 0.10, light: 0.09)
-        /// Mouse hover: a fainter layer, visually distinct from selection.
+        /// Mouse hover fill for interactive controls.
         static let rowHover = ramp(dark: 0.05, light: 0.045)
-        /// Emoji grid chrome: a quiet tile at rest, with two legible rings on interaction.
+        /// Quiet, steady tile behind emoji grid results.
         static let emojiCell = ramp(dark: 0.045, light: 0.04)
-        static let emojiHoverBorder = ramp(dark: 0.42, light: 0.34)
-        static let emojiSelectionBorder = adaptive(
-            dark: NSColor(srgbRed: 0.96, green: 0.90, blue: 0.72, alpha: 0.92),
-            light: .srgbInk(0, alpha: 0.72))
-        static let emojiInnerBorder = adaptive(
-            dark: .srgbInk(0, alpha: 0.72), light: .srgbInk(1, alpha: 0.72))
-        static let menuHover = ramp(dark: 0.10, light: 0.09)
         static let separator = ramp(dark: 0.10, light: 0.12)
         /// Small control surfaces: kbd chips, glyph tiles.
         static let controlSurface = ramp(dark: 0.10, light: 0.08)
@@ -419,7 +417,7 @@ enum Theme {
                 .init(color: Color(red: 0.66, green: 0.76, blue: 0.40), location: 1),
             ], startPoint: .top, endPoint: .bottom)
         static let paletteCaretGlowOpacity = 1.0
-        static let paletteCaretOpacity = 0.5
+        static let paletteCaretOpacity = 0.3
         static let menuSymbol = ramp(dark: 0.70, light: 0.70)
         static let noteText = ramp(dark: 0.90, light: 0.85)
         static let iconPlaceholder = ramp(dark: 0.06, light: 0.06)

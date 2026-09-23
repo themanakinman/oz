@@ -109,6 +109,10 @@ final class AIChatCoordinator {
 
     @discardableResult
     func send(_ input: String) -> Bool {
+        send(input, replaying: nil)
+    }
+
+    private func send(_ input: String, replaying message: ChatMessage?) -> Bool {
         guard settings.aiEnabled else { return false }
         do {
             let webSearch = core.aiSettings.webSearchEnabled && capabilities.webSearch
@@ -119,7 +123,8 @@ final class AIChatCoordinator {
                 instructions: AIInstructions.compose(
                     userPrompt: core.aiSettings.systemPrompt,
                     isEnabled: core.aiSettings.systemPromptEnabled),
-                contextBudget: contextBudget)
+                contextBudget: contextBudget,
+                replaying: message)
         } catch {
             chat.report(error.localizedDescription)
             return false
@@ -177,9 +182,24 @@ final class AIChatCoordinator {
         chat.cancel()
     }
 
-    func copyLastResponse() {
-        guard let text = chat.lastAssistantText else { return }
+    func rerun(_ message: ChatMessage) {
+        guard message.role == .user, !chat.isStreaming else { return }
+        if !message.images.isEmpty, !capabilities.images {
+            core.showMessage(ChatAttachmentRefusal.imagesUnsupported.message, tone: .neutral)
+            return
+        }
+        if !message.documents.isEmpty, !capabilities.documents {
+            core.showMessage(ChatAttachmentRefusal.documentsUnsupported.message, tone: .neutral)
+            return
+        }
+        _ = send(message.text, replaying: message)
+    }
+
+    @discardableResult
+    func copyLastResponse() -> Bool {
+        guard let text = chat.lastAssistantText else { return false }
         Paster.copyPlainText(text)
+        return true
     }
 
     /// What the selected model can take; the footer offers only what applies.

@@ -581,14 +581,16 @@ than `5.539e-05`.
 
 ## Result and rendering
 
-`CalcResult` carries an `expression` (left), a `display` / `copyText` payload (right), and optional
-`sourceBadge` / `targetBadge` word-name pills. `CalculatorCard` renders it as a two-column card.
+`CalcResult` carries an `expression`, a `display` / `copyText` payload and optional source and target
+badges. `CalculatorCard` shows only the formatted result centered above a `Result` copy glyph. Its
+surface stays transparent, with no hover or keyboard-selection highlight; clicking copies without
+closing Oz and briefly turns the copy glyph into a green check. Return still copies and closes.
 `Payload.number` rounds once, then groups that text for display; unit and percent suffixes share it.
 Date answers that display and copy identically also reuse their formatted text.
 
 When the launcher or Calculator History query evaluates to a result the card is pinned at the top of
-the list (flat selection index 0, shifting rows by one) and Enter copies the answer + records it to
-`CalculatorHistoryStore`.
+the list (flat selection index 0, shifting rows by one), centered in a two-and-a-half-row space.
+Enter copies the answer and records it to `CalculatorHistoryStore`.
 
 ## Number format
 

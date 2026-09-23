@@ -96,7 +96,6 @@ private struct FileSearchInfoSection: View {
             VStack(spacing: 0) {
                 let rows = self.rows
                 ForEach(rows) { row in
-                    if row.id != rows.first?.id { Divider() }
                     HStack(spacing: metrics.spacing.sm) {
                         Text(row.label).foregroundStyle(.secondary)
                         Spacer(minLength: metrics.spacing.lg)

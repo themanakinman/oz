@@ -24,7 +24,6 @@ struct ExtensionListView: View {
                 HStack(spacing: 0) {
                     rowList
                         .frame(width: metrics.scaled(Self.detailListWidth))
-                    Rectangle().fill(Theme.Colors.separator).frame(width: 1)
                     detailPane
                 }
             } else if case .grid(let layout) = screen.kind {
@@ -176,12 +175,6 @@ private struct ExtensionItemRow: View {
     let compact: Bool
     @State private var hovered = false
 
-    private var fill: Color {
-        if selected { return Theme.Colors.selection }
-        if hovered { return Theme.Colors.rowHover }
-        return .clear
-    }
-
     var body: some View {
         HStack(spacing: metrics.spacing.lg) {
             if let icon = node.props["icon"], icon != .null {
@@ -191,6 +184,7 @@ private struct ExtensionItemRow: View {
             Text(node.string("title") ?? "")
                 .font(metrics.typography.rowTitle)
                 .lineLimit(1)
+                .paletteResultText(isActive: selected || hovered)
                 // A detail list is 290pt wide, and an accessory would otherwise win the squeeze.
                 .layoutPriority(1)
             if !compact, let subtitle = node.string("subtitle"), !subtitle.isEmpty {
@@ -206,9 +200,6 @@ private struct ExtensionItemRow: View {
         }
         .padding(.horizontal, metrics.spacing.md)
         .padding(.vertical, metrics.spacing.sm)
-        .background(
-            RoundedRectangle(cornerRadius: metrics.radius.row, style: .continuous).fill(fill)
-        )
         .armedHover($hovered)
     }
 }
@@ -324,8 +315,7 @@ private struct ExtensionGridCell: View {
     }
 
     private var background: Color {
-        if selected { return Theme.Colors.selection }
-        return hovered ? Theme.Colors.rowHover : ExtensionColors.gridItemFill
+        return ExtensionColors.gridItemFill
     }
 
     var body: some View {
@@ -335,12 +325,14 @@ private struct ExtensionGridCell: View {
                 Text(title)
                     .font(metrics.typography.rowTrailing)
                     .lineLimit(1)
+                    .paletteResultText(isActive: selected || hovered)
             }
             if let subtitle = node.string("subtitle") {
                 Text(subtitle)
                     .font(metrics.typography.rowTrailing)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .paletteResultText(isActive: selected || hovered)
             }
         }
         .frame(width: width)
@@ -358,14 +350,6 @@ private struct ExtensionGridCell: View {
                     style: .continuous)
                     .fill(background)
             )
-            // A tile filled edge to edge hides that fill, so the ring is what marks the selection.
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: metrics.radius.custom(ExtensionGridLayout.tileRadius),
-                    style: .continuous)
-                    .strokeBorder(Theme.Colors.border, lineWidth: 2)
-                    .opacity(selected ? 1 : 0)
-            }
     }
 
     /// Filling content shares the tile's corner; inset artwork is small enough to need a tighter one.

@@ -1,6 +1,17 @@
 import SwiftUI
 
-/// Fill and hover for every lead card, so none can answer a selection differently from another.
+private struct LeadCardResultActiveKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var leadCardResultActive: Bool {
+        get { self[LeadCardResultActiveKey.self] }
+        set { self[LeadCardResultActiveKey.self] = newValue }
+    }
+}
+
+/// Stable card surface and text emphasis for every lead card.
 private struct LeadCardChrome: ViewModifier {
     @Environment(\.metrics) private var metrics
     let selected: Bool
@@ -9,8 +20,8 @@ private struct LeadCardChrome: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            .environment(\.leadCardResultActive, selected || hovered)
             .background(shape.fill(baseFill))
-            .background(shape.fill(fill))
             .armedHover($hovered)
     }
 
@@ -18,11 +29,6 @@ private struct LeadCardChrome: ViewModifier {
         RoundedRectangle(cornerRadius: metrics.radius.card, style: .continuous)
     }
 
-    private var fill: Color {
-        if selected { return Theme.Colors.selection }
-        if hovered { return Theme.Colors.rowHover }
-        return .clear
-    }
 }
 
 extension View {
@@ -35,6 +41,7 @@ extension View {
 /// One side of a two-column lead card: a value line with an optional word-name badge beneath.
 struct LeadCardColumn: View {
     @Environment(\.metrics) private var metrics
+    @Environment(\.leadCardResultActive) private var resultActive
     let text: AttributedString
     let badge: String?
     var weight: Font.Weight = .medium
@@ -46,6 +53,7 @@ struct LeadCardColumn: View {
                 .font(metrics.typography.calcResult.weight(weight))
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
+                .paletteResultText(isActive: resultActive)
             if let badge { LeadCardBadge(text: badge, hasBackground: badgeHasBackground) }
         }
         .frame(maxWidth: .infinity)

@@ -368,6 +368,9 @@ struct RootPaletteView: View {
             .onChange(of: vm.focusToken) {
                 searchFocused = !screen.hidesSearchField
             }
+            .onChange(of: vm.searchCaretResetToken) {
+                (hostWindow as? PalettePanel)?.resetFieldEditorCursorToBeginning()
+            }
             // A preserved screen re-summons as it was left, so a menu must end with the palette.
             .onChange(of: vm.isVisible) {
                 if !vm.isVisible, menuOpen { closeMenus() }
