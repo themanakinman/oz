@@ -122,7 +122,7 @@ struct PopoverMenu: View {
             attachedRadius: metrics.radius.menuAttachment)
         surfaceContent
             .frame(width: width ?? metrics.size.actionMenuWidth)
-            .paletteSurface(in: shape, backgroundOpacity: 0.9)
+            .paletteSurface(in: shape, backgroundOpacity: 0.9, blursBackdrop: true)
     }
 
     private var surfaceContent: some View {

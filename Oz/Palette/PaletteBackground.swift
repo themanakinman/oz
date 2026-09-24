@@ -48,10 +48,16 @@ private struct PaletteSurface<S: Shape>: ViewModifier {
     @Environment(AppSettings.self) private var settings
     let shape: S
     var backgroundOpacity: CGFloat?
+    var blursBackdrop: Bool
 
     func body(content: Content) -> some View {
         content.background {
             shape.fill(background)
+                .background {
+                    if blursBackdrop {
+                        VisualEffectView(material: .hudWindow, blending: .behindWindow)
+                    }
+                }
                 .overlay {
                     shape.stroke(
                         Theme.Colors.panelEdgeHighlight(transparency: settings.paletteTransparency),
@@ -70,7 +76,12 @@ private struct PaletteSurface<S: Shape>: ViewModifier {
 }
 
 extension View {
-    func paletteSurface(in shape: some Shape, backgroundOpacity: CGFloat? = nil) -> some View {
-        modifier(PaletteSurface(shape: AnyShape(shape), backgroundOpacity: backgroundOpacity))
+    func paletteSurface(
+        in shape: some Shape, backgroundOpacity: CGFloat? = nil, blursBackdrop: Bool = false
+    ) -> some View {
+        modifier(
+            PaletteSurface(
+                shape: AnyShape(shape), backgroundOpacity: backgroundOpacity,
+                blursBackdrop: blursBackdrop))
     }
 }
