@@ -906,6 +906,10 @@ struct RootPaletteView: View {
         vm.mode == .uninstall ? Theme.Colors.destructive : .primary
     }
 
+    private var footerScrollbarClearance: CGFloat {
+        metrics.size.panelWidth * Theme.Size.paletteFooterScrollbarClearanceFraction
+    }
+
     private func bottomBar(
         pillLabel: String, showActionGroup: Bool, formPrimaryShortcut: Bool, showActions: Bool
     ) -> some View {
@@ -917,6 +921,7 @@ struct RootPaletteView: View {
                 actionGroup(
                     pillLabel: pillLabel, formPrimaryShortcut: formPrimaryShortcut,
                     showActions: showActions)
+                    .padding(.trailing, footerScrollbarClearance)
             }
         }
         .padding(.horizontal, metrics.spacing.md)

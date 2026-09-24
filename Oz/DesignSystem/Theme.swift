@@ -62,6 +62,8 @@ enum Theme {
 
     enum Size {
         static let panelWidth: CGFloat = 600
+        /// Keeps the palette footer capsule clear of the trailing overlay scrollbar.
+        static let paletteFooterScrollbarClearanceFraction: CGFloat = 0.02
         static let panelHeight: CGFloat = 475
         static let launcherVisibleRows = 9
         /// Maximum launcher height: nine rows plus the header, footer and section breathing room.
