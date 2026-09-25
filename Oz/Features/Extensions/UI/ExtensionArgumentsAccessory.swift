@@ -17,8 +17,15 @@ enum ExtensionArgumentsAccessory {
         else { return nil }
 
         let icon = entry.iconSource
+        let maxFieldWidth = InlineArgumentFields.maximumFieldWidth(
+            fieldCount: arguments.count, hasIcon: true, metrics: metrics)
+        let currentValues = Dictionary(uniqueKeysWithValues: arguments.map {
+            ($0.name, values($0.name).wrappedValue)
+        })
         return PaletteHeaderAccessory(
-            width: CommandArgumentsRow.totalWidth(for: arguments, hasIcon: true, metrics: metrics),
+            width: CommandArgumentsRow.totalWidth(
+                for: arguments, hasIcon: true, metrics: metrics,
+                values: currentValues, maxFieldWidth: maxFieldWidth),
             fieldNames: arguments.map(\.name),
             firstIncompleteField: arguments.first {
                 $0.required && values($0.name).wrappedValue.isEmpty
@@ -26,6 +33,6 @@ enum ExtensionArgumentsAccessory {
             view: AnyView(
                 CommandArgumentsRow(
                     arguments: arguments, icon: icon, value: values, focused: focus,
-                    onSubmit: onSubmit)))
+                    maxFieldWidth: maxFieldWidth, onSubmit: onSubmit)))
     }
 }

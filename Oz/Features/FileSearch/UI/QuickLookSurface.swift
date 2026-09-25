@@ -20,6 +20,10 @@ struct QuickLookSurface: NSViewRepresentable {
 
     /// The preview holds its decoder open until it is closed, and this is the last chance.
     static func dismantleNSView(_ view: QLPreviewView, coordinator: ()) {
-        view.close()
+        // Quick Look emits KVO changes while closing. Doing that inside SwiftUI's view-graph
+        // teardown can notify observers that are already being dismantled and abort the app.
+        DispatchQueue.main.async {
+            view.close()
+        }
     }
 }

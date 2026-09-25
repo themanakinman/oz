@@ -18,11 +18,18 @@ enum CustomCommandArgumentsAccessory {
                 isOptional: argument.isOptional)
         }
         let value = { (id: String) in binding(command: command, id: id, vm: vm) }
+        let maxFieldWidth = InlineArgumentFields.maximumFieldWidth(
+            fieldCount: arguments.count, hasIcon: true, metrics: metrics)
+        let values = Dictionary(uniqueKeysWithValues: arguments.map {
+            ($0.id, value($0.id).wrappedValue)
+        })
         let firstOwed = {
             arguments.first { !$0.isOptional && value($0.id).wrappedValue.isEmpty }?.id
         }
         return PaletteHeaderAccessory(
-            width: InlineArgumentFields.totalWidth(for: arguments, hasIcon: true, metrics: metrics),
+            width: InlineArgumentFields.totalWidth(
+                for: arguments, hasIcon: true, metrics: metrics,
+                values: values, maxFieldWidth: maxFieldWidth),
             fieldNames: arguments.map(\.id),
             firstIncompleteField: firstOwed(),
             // Identity per row, so "which fields were left unanswered" starts clean on the next one.
@@ -34,7 +41,8 @@ enum CustomCommandArgumentsAccessory {
                     onSubmit: {
                         guard let owed = firstOwed() else { return onSubmit() }
                         focus.wrappedValue = owed
-                    }
+                    },
+                    maxFieldWidth: maxFieldWidth
                 )
                 .id(command.entryID))
         )

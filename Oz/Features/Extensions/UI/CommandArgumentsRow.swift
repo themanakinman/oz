@@ -9,6 +9,7 @@ struct CommandArgumentsRow: View {
     /// Binding factory keyed by argument name — the values live in the palette view's state.
     let value: (String) -> Binding<String>
     @FocusState.Binding var focused: String?
+    var maxFieldWidth: CGFloat? = nil
     /// ↵ from inside a field runs the command, like ↵ in the search field.
     let onSubmit: () -> Void
 
@@ -23,7 +24,7 @@ struct CommandArgumentsRow: View {
                     argument: argument,
                     text: value(argument.name),
                     isFocused: focused == argument.name,
-                    onSubmit: onSubmit
+                    onSubmit: onSubmit, maxFieldWidth: maxFieldWidth
                 )
                 .focused($focused, equals: argument.name)
             }
@@ -34,20 +35,34 @@ struct CommandArgumentsRow: View {
 
     /// The header shrinks the search field to exactly the room left over.
     static func totalWidth(
-        for arguments: [ExtensionCommandArgument], hasIcon: Bool, metrics: InterfaceMetrics
+        for arguments: [ExtensionCommandArgument], hasIcon: Bool, metrics: InterfaceMetrics,
+        values: [String: String] = [:], maxFieldWidth: CGFloat? = nil
     ) -> CGFloat {
-        let fields = arguments.reduce(0) { $0 + fieldWidth(for: $1, metrics: metrics) }
+        let fields = arguments.reduce(0) {
+            $0 + fieldWidth(
+                for: $1, metrics: metrics, text: values[$1.name] ?? "",
+                maxWidth: maxFieldWidth)
+        }
         let gaps = CGFloat(arguments.count + (hasIcon ? 0 : -1)) * metrics.spacing.xs
-        return fields + gaps + (hasIcon ? height(metrics) : 0)
+        let horizontalPadding = CGFloat(arguments.count) * metrics.spacing.sm * 2
+        return fields + horizontalPadding + gaps + (hasIcon ? height(metrics) : 0)
     }
 
     static func fieldWidth(
-        for argument: ExtensionCommandArgument, metrics: InterfaceMetrics
+        for argument: ExtensionCommandArgument, metrics: InterfaceMetrics,
+        text: String = "", maxWidth: CGFloat? = nil
     )
         -> CGFloat
     {
         let placeholder = CGFloat(argument.placeholder.count) * metrics.scaled(7)
-        return min(max(placeholder + metrics.scaled(20), metrics.scaled(62)), metrics.scaled(150))
+        let content = CGFloat(text.count) * metrics.scaled(7)
+        let minimum = metrics.scaled(text.isEmpty ? 62 : 28)
+        let preferred = text.isEmpty
+            ? placeholder + metrics.scaled(20)
+            : content + metrics.scaled(14)
+        return min(
+            max(preferred, minimum),
+            maxWidth ?? metrics.scaled(150))
     }
 
     /// The order Tab walks: search field (nil) → each argument → back to the search field.
@@ -67,6 +82,7 @@ private struct ArgumentField: View {
     @Binding var text: String
     let isFocused: Bool
     let onSubmit: () -> Void
+    let maxFieldWidth: CGFloat?
     @State private var hovered = false
 
     var body: some View {
@@ -79,16 +95,13 @@ private struct ArgumentField: View {
         .tint(.white)
         .onSubmit(onSubmit)
         .multilineTextAlignment(.center)
-        // Sized to the placeholder so a three-argument command still fits.
-        .frame(width: CommandArgumentsRow.fieldWidth(for: argument, metrics: metrics))
+        .frame(
+            width: CommandArgumentsRow.fieldWidth(
+                for: argument, metrics: metrics, text: text, maxWidth: maxFieldWidth))
         .padding(.horizontal, metrics.spacing.sm)
         .frame(height: CommandArgumentsRow.height(metrics))
         .background(
             RoundedRectangle(cornerRadius: metrics.radius.row, style: .continuous).fill(fill)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: metrics.radius.row, style: .continuous)
-                .strokeBorder(stroke, lineWidth: 1)
         )
         .onHover { hovered = $0 }
         .help(argument.required ? "\(argument.placeholder) — required" : argument.placeholder)
@@ -98,12 +111,5 @@ private struct ArgumentField: View {
         if isFocused { return Theme.Colors.selection }
         if hovered { return Theme.Colors.rowHover }
         return ExtensionColors.fieldFill
-    }
-
-    /// Focus reads as a brighter edge; an unfilled required argument stays amber.
-    private var stroke: Color {
-        if isFocused { return ExtensionColors.fieldFocusStroke }
-        if argument.required && text.isEmpty { return Color.orange.opacity(0.45) }
-        return ExtensionColors.fieldStroke
     }
 }

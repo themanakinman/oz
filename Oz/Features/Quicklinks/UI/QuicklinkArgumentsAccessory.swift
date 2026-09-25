@@ -27,10 +27,15 @@ enum QuicklinkArgumentsAccessory {
         let symbol: String? = nil
         let inputFontSize = metrics.typography.searchFieldSize * 0.7
         let value = { (name: String) in binding(quicklink: quicklink, name: name, vm: vm) }
+        let maxFieldWidth = InlineArgumentFields.maximumFieldWidth(
+            fieldCount: arguments.count, hasIcon: showsIcon, metrics: metrics)
+        let values = Dictionary(uniqueKeysWithValues: arguments.map {
+            ($0.id, value($0.id).wrappedValue)
+        })
         return PaletteHeaderAccessory(
             width: InlineArgumentFields.totalWidth(
                 for: arguments, hasIcon: showsIcon, metrics: metrics,
-                fontSize: inputFontSize),
+                fontSize: inputFontSize, values: values, maxFieldWidth: maxFieldWidth),
             fieldNames: arguments.map(\.id),
             firstIncompleteField: arguments.first {
                 !$0.isOptional && value($0.id).wrappedValue.isEmpty
@@ -49,6 +54,7 @@ enum QuicklinkArgumentsAccessory {
                     openOptions: onOpenOptions, onSubmit: onSubmit,
                     iconLink: showsIcon ? quicklink.link : nil,
                     iconSymbolOverride: quicklink.iconSymbol,
+                    maxFieldWidth: maxFieldWidth,
                     font: .system(size: inputFontSize, weight: .regular),
                     fieldHeight: metrics.size.headerHeight * 0.7,
                     fontSize: inputFontSize

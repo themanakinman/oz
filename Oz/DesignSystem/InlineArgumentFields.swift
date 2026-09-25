@@ -25,6 +25,7 @@ struct InlineArgumentFields: View {
     let onSubmit: () -> Void
     var iconLink: String? = nil
     var iconSymbolOverride: String? = nil
+    var maxFieldWidth: CGFloat? = nil
     var font: Font? = nil
     var fieldHeight: CGFloat? = nil
     var fontSize: CGFloat? = nil
@@ -47,7 +48,8 @@ struct InlineArgumentFields: View {
                     ArgumentField(
                         argument: argument, text: value(argument.id),
                         isFocused: focused == argument.id, isOwed: isOwed, onSubmit: onSubmit,
-                        font: font, fieldHeight: fieldHeight, fontSize: fontSize
+                        font: font, fieldHeight: fieldHeight, fontSize: fontSize,
+                        maxFieldWidth: maxFieldWidth
                     )
                     .focused($focused, equals: argument.id)
                 } else {
@@ -55,7 +57,7 @@ struct InlineArgumentFields: View {
                         argument: argument, text: value(argument.id),
                         isFocused: focused == argument.id, isOwed: isOwed,
                         onOpen: { openOptions(argument.id) }, font: font,
-                        fieldHeight: fieldHeight, fontSize: fontSize
+                        fieldHeight: fieldHeight, fontSize: fontSize, maxFieldWidth: maxFieldWidth
                     )
                     .focused($focused, equals: argument.id)
                 }
@@ -74,27 +76,57 @@ struct InlineArgumentFields: View {
     /// The header shrinks the search field to exactly the room left over.
     static func totalWidth(
         for arguments: [InlineArgument], hasIcon: Bool, metrics: InterfaceMetrics,
-        fontSize: CGFloat? = nil
+        fontSize: CGFloat? = nil, values: [String: String] = [:],
+        maxFieldWidth: CGFloat? = nil
     ) -> CGFloat {
         let fields = arguments.reduce(0) {
-            $0 + fieldWidth(for: $1, metrics: metrics, fontSize: fontSize)
+            $0 + fieldWidth(
+                for: $1, metrics: metrics, fontSize: fontSize,
+                text: values[$1.id] ?? "", maxWidth: maxFieldWidth)
         }
         let gaps = CGFloat(arguments.count + (hasIcon ? 0 : -1)) * metrics.spacing.xs
-        return fields + gaps + (hasIcon ? height(metrics) : 0)
+        let horizontalPadding = CGFloat(arguments.count) * metrics.spacing.sm * 2
+        return fields + horizontalPadding + gaps + (hasIcon ? height(metrics) : 0)
+    }
+
+    /// Each field can grow until the header must retain room for the search caret.
+    static func maximumFieldWidth(
+        fieldCount: Int, hasIcon: Bool, metrics: InterfaceMetrics
+    ) -> CGFloat {
+        guard fieldCount > 0 else { return 0 }
+        let accessoryBudget = max(
+            metrics.size.panelWidth - metrics.size.headerIconSlot - metrics.spacing.md * 4
+                - metrics.scaled(60),
+            0)
+        let gaps = CGFloat(fieldCount + (hasIcon ? 0 : -1)) * metrics.spacing.xs
+        let horizontalPadding = CGFloat(fieldCount) * metrics.spacing.sm * 2
+        let leadingIcon = hasIcon ? height(metrics) : 0
+        return max(
+            metrics.scaled(72),
+            (accessoryBudget - gaps - horizontalPadding - leadingIcon) / CGFloat(fieldCount))
     }
 
     static func fieldWidth(
-        for argument: InlineArgument, metrics: InterfaceMetrics, fontSize: CGFloat? = nil
+        for argument: InlineArgument, metrics: InterfaceMetrics, fontSize: CGFloat? = nil,
+        text: String = "", maxWidth: CGFloat? = nil
     ) -> CGFloat {
         if let fontSize {
             let title = CGFloat(argument.title.count) * fontSize * 0.56
+            let content = CGFloat(text.count) * fontSize * 0.56
             let scale = fontSize / metrics.typography.searchFieldSize
-            return min(
-                max(title + metrics.scaled(28) * scale, metrics.scaled(108) * scale),
-                metrics.scaled(220) * scale)
+            let minimum = metrics.scaled(text.isEmpty ? 108 : 28) * scale
+            let preferred = text.isEmpty
+                ? title + metrics.scaled(28) * scale
+                : content + metrics.scaled(16) * scale
+            return min(max(preferred, minimum), maxWidth ?? metrics.scaled(220) * scale)
         }
         let title = CGFloat(argument.title.count) * metrics.scaled(7)
-        return min(max(title + metrics.scaled(34), metrics.scaled(72)), metrics.scaled(160))
+        let content = CGFloat(text.count) * metrics.scaled(7)
+        let minimum = metrics.scaled(text.isEmpty ? 72 : 28)
+        let preferred = text.isEmpty ? title + metrics.scaled(34) : content + metrics.scaled(14)
+        return min(
+            max(preferred, minimum),
+            maxWidth ?? metrics.scaled(160))
     }
 }
 
@@ -108,20 +140,19 @@ private struct ArgumentFieldChrome: ViewModifier {
     @Binding var hovered: Bool
     let fieldHeight: CGFloat?
     let fontSize: CGFloat?
+    let text: String
+    let maxFieldWidth: CGFloat?
 
     func body(content: Content) -> some View {
         content
             .frame(
                 width: InlineArgumentFields.fieldWidth(
-                    for: argument, metrics: metrics, fontSize: fontSize))
+                    for: argument, metrics: metrics, fontSize: fontSize,
+                    text: text, maxWidth: maxFieldWidth))
             .padding(.horizontal, metrics.spacing.sm)
             .frame(height: fieldHeight ?? InlineArgumentFields.height(metrics))
             .background(
                 RoundedRectangle(cornerRadius: metrics.radius.row, style: .continuous).fill(fill)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: metrics.radius.row, style: .continuous)
-                    .strokeBorder(stroke, lineWidth: 1)
             )
             .onHover { hovered = $0 }
             .help(help)
@@ -138,12 +169,6 @@ private struct ArgumentFieldChrome: ViewModifier {
         return Theme.Colors.cardFill
     }
 
-    /// Focus reads as a brighter edge; only a field left behind unanswered turns red.
-    private var stroke: Color {
-        if isFocused { return Color.accentColor }
-        if isOwed { return Theme.Colors.destructive.opacity(0.55) }
-        return Theme.Colors.cardStroke
-    }
 }
 
 private struct ArgumentField: View {
@@ -157,6 +182,7 @@ private struct ArgumentField: View {
     let font: Font?
     let fieldHeight: CGFloat?
     let fontSize: CGFloat?
+    let maxFieldWidth: CGFloat?
     @State private var hovered = false
 
     var body: some View {
@@ -172,7 +198,8 @@ private struct ArgumentField: View {
         .modifier(
             ArgumentFieldChrome(
                 argument: argument, isFocused: isFocused, isOwed: isOwed && text.isEmpty,
-                hovered: $hovered, fieldHeight: fieldHeight, fontSize: fontSize))
+                hovered: $hovered, fieldHeight: fieldHeight, fontSize: fontSize,
+                text: text, maxFieldWidth: maxFieldWidth))
     }
 }
 
@@ -187,6 +214,7 @@ private struct ArgumentChoiceField: View {
     let font: Font?
     let fieldHeight: CGFloat?
     let fontSize: CGFloat?
+    let maxFieldWidth: CGFloat?
     @State private var hovered = false
 
     var body: some View {
@@ -205,11 +233,12 @@ private struct ArgumentChoiceField: View {
         .modifier(
             ArgumentFieldChrome(
                 argument: argument, isFocused: isFocused, isOwed: isOwed && text.isEmpty,
-                hovered: $hovered, fieldHeight: fieldHeight, fontSize: fontSize)
+                hovered: $hovered, fieldHeight: fieldHeight, fontSize: fontSize,
+                text: text, maxFieldWidth: maxFieldWidth)
         )
         .contentShape(Rectangle())
         .focusable()
-        // The chrome draws the focused edge, so AppKit's blue ring would be a second one.
+        // Keep AppKit's blue ring out of the borderless argument bubble.
         .focusEffectDisabled()
         .onTapGesture(perform: onOpen)
         .onKeyPress(keys: [.return, KeyEquivalent("\u{3}")]) { _ in
