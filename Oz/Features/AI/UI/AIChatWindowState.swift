@@ -87,23 +87,26 @@ final class AIChatWindowState {
 
     private func toolMenu(coordinator: AIChatCoordinator, chat: AIChatState) -> PopoverMenuContent {
         let servers = coordinator.mcpServers
-        var items: [PopoverMenuItem] = []
-        if !servers.isEmpty {
-            items.append(PopoverMenuItem(
+        var items: [PopoverMenuItem] = [
+            PopoverMenuItem(
                 title: chat.toolScope.isEnabled ? "Disable Tools" : "Enable Tools",
                 systemImage: "wrench.and.screwdriver"
             ) {
                 coordinator.setToolsEnabled(!chat.toolScope.isEnabled, in: chat)
-            })
-            items += servers.enumerated().map { index, server in
-                PopoverMenuItem(
-                    title: server.name.isEmpty ? server.slug : server.name, icon: .blank,
-                    isEnabled: chat.toolScope.isEnabled,
-                    sectionTitle: index == 0 ? "Servers" : nil,
-                    detail: chat.toolScope.allows(server.slug) ? "✓" : nil
-                ) {
-                    coordinator.toggleToolServer(server.slug, in: chat)
-                }
+            },
+            PopoverMenuItem(
+                title: "Files", icon: .symbol("folder"), isEnabled: chat.toolScope.isEnabled,
+                detail: chat.toolScope.allows(AIFileTools.handle) ? "✓" : nil
+            ) { coordinator.toggleToolServer(AIFileTools.handle, in: chat) }
+        ]
+        items += servers.enumerated().map { index, server in
+            PopoverMenuItem(
+                title: server.name.isEmpty ? server.slug : server.name, icon: .blank,
+                isEnabled: chat.toolScope.isEnabled,
+                sectionTitle: index == 0 ? "Servers" : nil,
+                detail: chat.toolScope.allows(server.slug) ? "✓" : nil
+            ) {
+                coordinator.toggleToolServer(server.slug, in: chat)
             }
         }
         items.append(PopoverMenuItem(

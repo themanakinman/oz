@@ -27,9 +27,9 @@ private final class InstalledCLITurnRunner {
         """
     /// The same boundary, for the one route that is handed tools: everything else stays off.
     private static let toolSafetyInstructions = """
-        You are generating text inside Oz. The only tools you may use are the MCP tools \
-        supplied with this request. Do not read files, inspect the environment, access external \
-        resources, or modify anything else.
+        You are an assistant inside Oz. Use only the MCP tools supplied with this request. \
+        Perform filesystem operations through the built-in Files tools when offered. \
+        Native commands and file tools are unavailable.
         """
     private static let openCodeConfiguration = """
         {"permission":"deny","share":"disabled","agent":{"build":{"permission":"deny"},\

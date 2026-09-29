@@ -508,6 +508,7 @@ run ai-provider-test       Oz/Features/Settings/AppSettingsKey.swift \
                            Oz/Features/AI/Model/*.swift \
                            Oz/Features/AI/Settings/AISettingsStore.swift
 run ai-chat-test           Oz/Features/AI/Model/AIRequest.swift \
+                           Oz/Features/AI/Model/AIFileTools.swift \
                            Oz/Features/AI/Model/AIConnection.swift \
                            Oz/Features/AI/Model/AppleIntelligence.swift \
                            Oz/Features/AI/Model/AIAttachmentPolicy.swift \

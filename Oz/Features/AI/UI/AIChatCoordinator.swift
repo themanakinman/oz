@@ -267,7 +267,7 @@ final class AIChatCoordinator {
             let sent = chat.send(
                 address.rest, using: try provider(for: chat, scopedTo: address.slug),
                 model: model(for: chat), webSearch: webSearch(for: chat),
-                instructions: instructions, contextBudget: contextBudget(for: chat),
+                instructions: instructions(for: chat, scopedTo: address.slug), contextBudget: contextBudget(for: chat),
                 toolScope: address.slug)
             // Named while the answer streams, so the sidebar has a title before the reply ends.
             if sent { nameIfNeeded(chat) }
@@ -293,7 +293,7 @@ final class AIChatCoordinator {
             let sent = chat.send(
                 message.text, using: try provider(for: chat, scopedTo: message.toolScope),
                 model: model(for: chat), webSearch: webSearch(for: chat),
-                instructions: instructions, contextBudget: contextBudget(for: chat),
+                instructions: instructions(for: chat, scopedTo: message.toolScope), contextBudget: contextBudget(for: chat),
                 toolScope: message.toolScope, replaying: message)
             if sent { nameIfNeeded(chat) }
         } catch {
@@ -309,7 +309,7 @@ final class AIChatCoordinator {
             chat.regenerate(
                 using: try provider(for: chat, scopedTo: scope),
                 model: model(for: chat), webSearch: webSearch(for: chat),
-                instructions: instructions, contextBudget: contextBudget(for: chat))
+                instructions: instructions(for: chat, scopedTo: scope), contextBudget: contextBudget(for: chat))
         } catch {
             chat.report(error.localizedDescription)
         }
@@ -319,10 +319,23 @@ final class AIChatCoordinator {
         core.aiSettings.webSearchEnabled && capabilities(for: chat).webSearch
     }
 
-    private var instructions: String? {
-        AIInstructions.compose(
+    private func instructions(for chat: AIChatState, scopedTo slug: String?) -> String? {
+        let prompt = AIInstructions.compose(
             userPrompt: core.aiSettings.systemPrompt,
             isEnabled: core.aiSettings.systemPromptEnabled)
+        guard filesEnabled(in: chat, scopedTo: slug) else { return prompt }
+        return [prompt, AIFileTools.instructions(home: fileRunner.home.path)]
+            .compactMap { $0 }.joined(separator: "\n\n")
+    }
+
+    private var fileRunner: AIFileToolRunner {
+        AIFileToolRunner(
+            home: FileManager.default.homeDirectoryForCurrentUser,
+            revisions: AppPaths.applicationSupport().appendingPathComponent("AI/File Revisions", isDirectory: true))
+    }
+
+    private func filesEnabled(in chat: AIChatState, scopedTo slug: String?) -> Bool {
+        capabilities(for: chat).tools && slug == nil && chat.toolScope.allows(AIFileTools.handle)
     }
 
     /// A turn's route and its tools: a CLI with its own client is handed servers, others the loop.
@@ -339,10 +352,24 @@ final class AIChatCoordinator {
         let excluded = chat.toolScope.excluded
         let chatID = chat.session.id
         let mcp = core.mcpCoordinator
+        let files: [AIToolServer]
+        if filesEnabled(in: chat, scopedTo: slug) {
+            let runner = fileRunner
+            let executable = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/AIFileHelper")
+            files = [AIToolServer(
+                handle: AIFileTools.handle, title: AIFileTools.origin,
+                transport: .command(path: executable.path,
+                                    arguments: [runner.home.path, runner.revisions.path], environment: [:]))]
+        } else { files = [] }
         return AIToolServerSession(rounds: core.aiSettings.toolRounds.limit) {
-            await mcp.toolServers(scopedTo: slug).filter { !excluded.contains($0.handle) }
+            files + (await mcp.toolServers(scopedTo: slug).filter {
+                $0.handle != AIFileTools.handle && !excluded.contains($0.handle)
+            })
         } consent: { call in
-            await mcp.permit(call, in: chatID)
+            if call.handle == AIFileTools.handle {
+                return !files.isEmpty && AIFileTools.owns(AIFileTools.prefix + call.tool)
+            }
+            return await mcp.permit(call, in: chatID)
         }
     }
 
@@ -353,10 +380,15 @@ final class AIChatCoordinator {
         let tools = tools(for: chat, scopedTo: slug)
         guard capabilities(for: chat).tools, !tools.isEmpty else { return provider }
         let chatID = chat.session.id
+        let runner = filesEnabled(in: chat, scopedTo: slug) ? fileRunner : nil
         return AIToolLoopProvider(
             base: provider, tools: tools, maxRounds: core.aiSettings.toolRounds.limit
         ) { [mcp = core.mcpCoordinator] call in
-            await mcp.invoke(call, in: chatID)
+            if AIFileTools.owns(call.name) {
+                guard let runner else { return .failure(call.id, "Filesystem tools are disabled for this turn.") }
+                return await runner.invoke(call)
+            }
+            return await mcp.invoke(call, in: chatID)
         }
     }
 
@@ -364,9 +396,10 @@ final class AIChatCoordinator {
     private func tools(for chat: AIChatState, scopedTo slug: String?) -> [AITool] {
         guard chat.toolScope.isEnabled else { return [] }
         let excluded = chat.toolScope.excluded
-        return core.mcpCoordinator.tools(scopedTo: slug).filter { tool in
+        let files = filesEnabled(in: chat, scopedTo: slug) ? AIFileTools.tools : []
+        return files + core.mcpCoordinator.tools(scopedTo: slug).filter { tool in
             guard let route = MCPToolName.parse(tool.name) else { return true }
-            return !excluded.contains(route.slug)
+            return route.slug != AIFileTools.handle && !excluded.contains(route.slug)
         }
     }
 
@@ -375,10 +408,12 @@ final class AIChatCoordinator {
 
     func setToolsEnabled(_ enabled: Bool, in chat: AIChatState) {
         chat.toolScope.isEnabled = enabled
+        if !enabled { chat.cancel() }
     }
 
     func toggleToolServer(_ slug: String, in chat: AIChatState) {
         chat.toolScope.toggle(slug)
+        if !chat.toolScope.allows(slug) { chat.cancel() }
     }
 
     func showMCPSettings() {
@@ -439,7 +474,7 @@ final class AIChatCoordinator {
             systemPrompt: core.aiSettings.systemPromptEnabled,
             webSearch: core.aiSettings.webSearchEnabled && can.webSearch,
             toolServers: can.tools && scope.isEnabled
-                ? mcpServers.count { scope.allows($0.slug) } : 0)
+                ? mcpServers.count { scope.allows($0.slug) } + (scope.allows(AIFileTools.handle) ? 1 : 0) : 0)
     }
 
     // MARK: - Attachments

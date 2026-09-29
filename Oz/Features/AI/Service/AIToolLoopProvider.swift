@@ -60,10 +60,16 @@ struct AIToolLoopProvider: AIProvider {
             carried += round.text.utf8.count + round.calls.reduce(0) { $0 + $1.arguments.utf8.count }
             for call in round.calls {
                 try Task.checkCancellation()
-                let tool = tools.first { $0.name == call.name }
+                guard let tool = tools.first(where: { $0.name == call.name }) else {
+                    throw AIProviderError.responseFailed("The model requested a tool that was not offered.")
+                }
+                guard spent < Self.maxTurnResultBytes else {
+                    throw AIProviderError.responseFailed("Stopped because this turn's tool output budget is used up.")
+                }
                 continuation.yield(
                     .toolCall(
-                        id: call.id, origin: tool?.origin ?? "", title: tool?.title ?? call.name))
+                        id: call.id, origin: tool.origin,
+                        title: AIFileTools.activity(name: call.name, arguments: call.arguments) ?? tool.title))
                 let result = await bounded(invoke(call), spent: &spent)
                 continuation.yield(.toolResult(id: call.id, isError: result.isError))
                 carried += result.content.utf8.count

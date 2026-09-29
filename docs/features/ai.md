@@ -11,6 +11,47 @@ from the launcher asks what you typed, and the answer appears in place. **AI Cha
 saved conversations in a sidebar on the left, the open one on the right, and Quick AI’s prompt at the
 top beside the model picker, with Send and Actions floating below. ⌘J hands a Quick AI conversation to the window.
 
+## Autonomous files
+
+Both existing surfaces offer **Files** by default for Codex, Claude, and API models with tool calling.
+There is no folder picker or project setup. The model receives the user's home path and can discover
+directories anywhere on the filesystem, subject to macOS access permissions. Apple Intelligence,
+Grok, OpenCode and Cursor remain text routes. The selected model receives the content of files it reads.
+
+`AIFileTools` defines directory listing, name and text search, paged UTF-8 reads, file creation and
+replacement, exact text edits, directory creation, moves, Trash, version listing and restoration.
+`AIFileToolRunner` performs those operations off the main thread for API models. Codex and Claude
+receive the bundled stdio MCP executable `Contents/Helpers/AIFileHelper`, which uses the same runner.
+Built-in Files calls are answered automatically with no Allow/Deny dialog, independently of the MCP
+setting. External servers retain their existing trust policy. `oz-files` is reserved for the built-in
+server so an external server cannot inherit its automatic approval.
+
+The safeguards are enforced by the runner:
+
+- Writes and exact edits require the revision returned by a read, or `missing` for new files.
+  Stale reads and ambiguous replacements fail; existing move destinations are never overwritten.
+- Before replacing a file, its original bytes are saved with a checkpoint ID in
+  `Application Support/<bundle id>/AI/File Revisions/`. The directory is private, channel specific,
+  protected from mutation tools, and retained across chats. Restoration requires the current revision
+  and saves the content it replaces too. `file_versions` discovers recovery IDs in later turns.
+  Failed backup creation prevents an edit.
+- Removal uses macOS Trash; there is no permanent deletion operation. Moving or trashing a final
+  symbolic link is refused. Other paths resolve symbolic links before policy checks.
+- System paths, Git metadata, Codex configuration, and checkpoints are protected from modification.
+  Filesystem roots and the main home folders cannot be moved or trashed.
+- File reads and edits are limited to 8 MB. Searches have time, depth, byte and result bounds;
+  output is bounded valid JSON. A cross-process lock serializes Oz's filesystem mutations.
+- The Tools menu can disable Files or all tools. Disabling a capability cancels the active reply;
+  completed effects remain, and an operation already in progress may finish. Stop interrupts the
+  turn. Unknown or unoffered tool names cannot execute through Oz's API loop.
+
+This iteration supplies autonomous filesystem operations. Shell execution, builds, test commands,
+package installation and Git commands are not offered by Files. Native CLI execution and file tools
+remain disabled; trusted external MCP tools have their own capabilities and are not governed by the
+built-in runner's filesystem policy. Arbitrary shell execution needs an enforcement design before
+it can share the automatic approval path. Quick Actions receives no Files access, and title
+generation cannot execute Files calls.
+
 ## Invariants
 
 - **AI is off out of the box, and off means fully off.** `AppSettings.aiEnabled` is the flag:
@@ -31,7 +72,8 @@ top beside the model picker, with Send and Actions floating below. ⌘J hands a 
   never a scope limit — and asks for honest comparisons; it does not instruct the model to favour
   Oz over anything else. It is not shown in the pane, and `AIPreamble.swift` holds the only
   copy of it — edit the prompt there, not here. `compose` returns `nil` when the user has turned
-  the system prompt off, and every transport drops a nil instruction, so a turn then carries none.
+  the system prompt off. Files-enabled turns still carry their operational instructions; CLI routes
+  also retain their transport safety instructions.
 - **API keys live only in the login Keychain.** `AIConnection` persists the provider, endpoint and
   model identifiers in `UserDefaults`; it never contains a key. Keys are addressed by connection UUID
   through `KeychainSecretStore.aiAPIKeys`, and never enter logs, errors or settings backups. A key is issued for one
@@ -85,8 +127,9 @@ top beside the model picker, with Send and Actions floating below. ⌘J hands a 
   linked `[n]`: `ChatCitations` finds each link's sentence end in the drawn text and inserts after
   it, two sources in one sentence sharing it, so prose and chips always agree. The preamble asks the model to link a page it relies on inline, so a cited
   answer carries its sources without a second request.
-- **Tools are chosen per chat.** The composer's tools menu switches MCP off for the chat or turns
-  single servers off (`ChatToolScope`, held on `AIChatState`, not stored); `@server` still narrows
+- **Tools are chosen per chat.** The composer's tools menu switches all tools off for the chat or
+  turns Files and individual servers off (`ChatToolScope`, held on `AIChatState`, not stored);
+  `@server` excludes Files and narrows
   one turn inside that. The scope binds both shapes alike: Oz's loop is offered only the
   allowed servers' tools, and a Codex or Claude turn is handed only the allowed servers. A route that
   cannot call tools shows the menu disabled and says why.
@@ -120,16 +163,18 @@ top beside the model picker, with Send and Actions floating below. ⌘J hands a 
 - **Installed commands reuse their own login.** Oz launches the user's `codex`, `claude`, `grok` or
   `opencode` executable without asking for or storing another key. Codex inherits the user's normal
   home and credential-store setting; Claude, Grok, OpenCode and Cursor inherit their normal configuration. Oz
-  never reads those credential files, browser cookies or undocumented web endpoints.
+  does not read credential files for provider authentication or use undocumented web endpoints.
+  Files tools can read OS-accessible files when requested by the model.
 - **Codex runs Oz's MCP servers and nothing else.** The app-server still launches with every
   feature flag off and a read-only, network-disabled sandbox, and every server request but one is
   declined. What changed is the list: the servers the reader configured for their own Codex are
   disabled by name at launch — which they were not before, so they used to start inside Oz
-  threads — and the servers [MCP](mcp.md) supplies take their place when a chat has any, under
+  threads — and built-in Files plus the servers [MCP](mcp.md) supplies take their place, under
   names of their own (`oz-<handle>`) so that no table of the reader's merges into one. A
   launch that cannot read the reader's list, or cannot address a name on it, does not start. A turn
   that arms none keeps `approvalPolicy: "never"`; a turn that arms some uses `"untrusted"`, where
-  a tool call becomes an elicitation Oz answers from the reader's own trust setting.
+  a tool call becomes an elicitation. Files is automatically granted; external calls use the
+  reader's trust setting. Filesystem effects happen in the helper, outside the app-server sandbox.
 - **Tool calling is a decorator, except where the CLI is the client.** `AIToolLoopProvider` wraps a
   route and re-streams the turn until the model stops asking, so a route with no tools behaves
   exactly as it did and `AIChatState` reduces one more pair of events. Codex and the Claude command
@@ -151,7 +196,7 @@ top beside the model picker, with Send and Actions floating below. ⌘J hands a 
   run.** Claude runs one turn with no tools, browser integration, slash commands or persisted
   session — but never `--bare`, which reads neither
   OAuth nor the keychain and so refuses the very sign-in this route reuses. Given servers by
-  [MCP](mcp.md) it becomes an agent for that turn and only over those: `--tools ""` still withholds
+  Files or [MCP](mcp.md) it becomes an agent for that turn and only over those: `--tools ""` still withholds
   every built-in, the turn keeps its stream-json stdin open so consent has a pipe to answer on,
   `--disallowedTools "*"` comes off because it removes the MCP tools too, `--max-turns` carries
   the round cap instead of the constant 1, or is left out on Unlimited, and
@@ -729,7 +774,7 @@ existing messages. Debug builds continue to use the `com.oz.app.dev` data and pr
 Oz retains its existing dark color values, generic empty-state prompt, animated thinking phrases,
 prompt anchoring, rerun actions and quick-chat shortcuts. The window uses the square palette surface, its transparency setting, shared animated caret,
 the alpha text ramp and Interface Size metrics. The local shell execution restriction remains in
-place; this port prepares richer chat surfaces and provider tool plumbing for a later execution task.
+place; built-in Files now enables the autonomous filesystem operations described above.
 
 ## Settings and backup boundary
 

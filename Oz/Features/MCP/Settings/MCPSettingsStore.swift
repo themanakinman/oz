@@ -49,7 +49,7 @@ final class MCPSettingsStore {
     private func normalized(_ server: MCPServer) -> MCPServer {
         var server = server
         server.name = server.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let taken = Set(servers.filter { $0.id != server.id }.map(\.slug))
+        let taken = Set(servers.filter { $0.id != server.id }.map(\.slug)).union(MCPSlug.reserved)
         let derived = MCPSlug.normalize(server.name.isEmpty ? server.slug : server.name)
         if server.slug != derived || taken.contains(server.slug) {
             server.slug = MCPSlug.make(from: derived, existing: taken)

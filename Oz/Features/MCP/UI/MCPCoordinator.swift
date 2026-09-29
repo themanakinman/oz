@@ -38,8 +38,10 @@ final class MCPCoordinator {
     /// The Codex helper keeps what it was launched with, so a server taken away is taken from it.
     private func dropWithdrawnServers(besides withdrawn: UUID? = nil) {
         let offered = store.enabledServers.filter { $0.trust != .never && $0.id != withdrawn }
+        var handles = isActive ? Set(offered.map(\.slug)) : []
+        if settings.aiEnabled { handles.insert(AIFileTools.handle) }
         core.chatGPTSubscription.dropWithdrawnServers(
-            keeping: isActive ? Set(offered.map(\.slug)) : [])
+            keeping: handles)
     }
 
     /// Connecting on the way into chat, so the first send does not wait on every handshake.
@@ -62,7 +64,7 @@ final class MCPCoordinator {
     /// What a chat's tools menu lists; empty while MCP is off.
     var servers: [MCPServer] {
         guard isActive else { return [] }
-        return store.enabledServers
+        return store.enabledServers.filter { $0.slug != AIFileTools.handle }
     }
 
     func server(slug: String) -> MCPServer? {

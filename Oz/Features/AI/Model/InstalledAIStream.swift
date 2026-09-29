@@ -126,9 +126,13 @@ enum InstalledAIStreamDecoder {
                 guard let id = block["id"] as? String, let name = block["name"] as? String,
                     let call = ClaudeMCPLaunch.route(name)
                 else { return nil }
+                let input = (try? JSONSerialization.data(withJSONObject: block["input"] ?? [:], options: [.fragmentsAllowed]))
+                    .flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+                let title = call.handle == AIFileTools.handle
+                    ? AIFileTools.activity(name: call.tool, arguments: input) : nil
                 return .toolCall(
                     id: id, origin: AIToolServerRow.title(of: call.handle, in: servers),
-                    title: AIToolServerRow.label(call.tool))
+                    title: title ?? AIToolServerRow.label(call.tool))
             case "tool_result":
                 guard let id = block["tool_use_id"] as? String else { return nil }
                 return .toolResult(id: id, isError: block["is_error"] as? Bool == true)
