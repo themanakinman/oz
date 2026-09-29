@@ -78,12 +78,18 @@ final class CodexAppServerClient {
     ) async -> [String]? {
         var environment = ProcessInfo.processInfo.environment
         environment["NO_COLOR"] = "1"
+        environment["PATH"] = commandPath(executable: executable, environment: environment)
         if let codexHome { environment["CODEX_HOME"] = codexHome.path }
         let result = await InstalledAIProbe.run(
             executable: executable, arguments: configurationFlags + ["mcp", "list", "--json"],
             workspace: workspace, environment: environment)
         guard result.status == 0 else { return nil }
         return CodexMCPLaunch.foreignNames(listing: result.output)
+    }
+
+    nonisolated private static func commandPath(executable: URL, environment: [String: String]) -> String {
+        ([executable.deletingLastPathComponent().path, "/opt/homebrew/bin", "/usr/local/bin"]
+            + [environment["PATH"] ?? "/usr/bin:/bin"]).joined(separator: ":")
     }
 
     var isRunning: Bool { process?.isRunning == true }
@@ -173,18 +179,9 @@ final class CodexAppServerClient {
             + CodexMCPLaunch.arguments(servers: toolServers, disabling: foreign)
             + ["app-server"]
         process.currentDirectoryURL = workspace
-        let inheritedPath = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
-        let commandPaths = [
-            executable.deletingLastPathComponent().path,
-            "/opt/homebrew/bin",
-            "/usr/local/bin"
-        ]
-        var environment = ProcessInfo.processInfo.environment.merging(
-            [
-                "NO_COLOR": "1",
-                "PATH": (commandPaths + [inheritedPath]).joined(separator: ":")
-            ]
-        ) { _, value in value }
+        var environment = ProcessInfo.processInfo.environment
+        environment["NO_COLOR"] = "1"
+        environment["PATH"] = Self.commandPath(executable: executable, environment: environment)
         environment.merge(secrets) { _, new in new }
         // Tests can isolate app-server state; production deliberately inherits the user's Codex home.
         if let codexHome { environment["CODEX_HOME"] = codexHome.path }

@@ -76,8 +76,10 @@ struct AISkillCatalog: Sendable {
         }
     }
 
-    func instructions(for input: String, file: URL, canReadFiles: Bool) throws -> String? {
-        switch AISkillCommand.parse(input, identifiers: identifiers) {
+    func instructions(
+        for input: String, file: URL, canReadFiles: Bool, shortcutEnabled: Bool = true
+    ) throws -> String? {
+        switch AISkillCommand.parse(input, identifiers: identifiers, shortcutEnabled: shortcutEnabled) {
         case .invocation(let id, _), .browse(let id):
             guard !id.isEmpty else { throw Failure.selectionRequired }
             guard let skill = skills.first(where: { $0.id == id.lowercased() }) else { throw Failure.missing(id) }

@@ -329,7 +329,8 @@ final class AIChatCoordinator {
             isEnabled: core.aiSettings.systemPromptEnabled)
         let files = filesEnabled(in: chat, scopedTo: slug)
         let skills = chat === chats.quickAI
-            ? try core.aiSkills.instructions(for: input, canReadFiles: files) : nil
+            ? try core.aiSkills.instructions(
+                for: input, canReadFiles: files, shortcutEnabled: core.aiSettings.skillsShortcutEnabled) : nil
         let parts = [prompt, files ? AIFileTools.instructions(home: fileRunner.home.path) : nil, skills]
             .compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: "\n\n")
@@ -747,7 +748,7 @@ final class AIChatCoordinator {
     }
 
     func showsReasoningControl(for chat: AIChatState) -> Bool {
-        model(for: chat)?.effort != nil || !reasoningEfforts(for: chat).isEmpty
+        model(for: chat)?.showsReasoningControl(availableEfforts: reasoningEfforts(for: chat)) == true
     }
 
     func reasoningOptionsNeedRefresh(for chat: AIChatState) -> Bool {

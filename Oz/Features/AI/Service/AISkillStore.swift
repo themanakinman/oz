@@ -32,12 +32,17 @@ final class AISkillStore {
         }
     }
 
-    func instructions(for input: String, canReadFiles: Bool) throws -> String? {
+    func instructions(
+        for input: String, canReadFiles: Bool, shortcutEnabled: Bool = true
+    ) throws -> String? {
         if catalog == nil, error == nil, !isLoading { refresh() }
-        if AISkillCommand.parse(input) != nil, catalog == nil {
+        if AISkillCommand.parse(input, shortcutEnabled: shortcutEnabled) != nil, catalog == nil {
             throw AISkillCatalog.Failure.invalid(error ?? "skills are loading; try again in a moment.")
         }
-        if let catalog { return try catalog.instructions(for: input, file: file, canReadFiles: canReadFiles) }
+        if let catalog {
+            return try catalog.instructions(
+                for: input, file: file, canReadFiles: canReadFiles, shortcutEnabled: shortcutEnabled)
+        }
         guard canReadFiles, error == nil else { return nil }
         return """
             Oz's shared skill instructions are in \(file.path). Read the file with read_file

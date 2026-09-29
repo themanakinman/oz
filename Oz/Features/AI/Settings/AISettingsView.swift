@@ -122,6 +122,10 @@ struct AISettingsView: View {
     private var chatSection: some View {
         @Bindable var settings = settings
         return Section {
+            Toggle(isOn: $settings.skillsShortcutEnabled) {
+                SettingsRowTitle(.aiChat, "Show Skills on /")
+                Text("Open Quick AI skills from any command palette view.")
+            }
             Toggle(isOn: $settings.webSearchEnabled) {
                 SettingsRowTitle(.aiChat, "Web search")
                 Text("Codex and OpenRouter only. Prompts go to a search engine.")

@@ -375,6 +375,9 @@ struct RootPaletteView: View {
             .onChange(of: vm.focusToken) {
                 searchFocused = !screen.hidesSearchField
             }
+            .onChange(of: vm.isComposing) {
+                if !menuOpen { core.quickAICoordinator.openSkillsFromPalette() }
+            }
             .onChange(of: vm.searchCaretResetToken) {
                 (hostWindow as? PalettePanel)?.resetFieldEditorCursor(toEnd: vm.searchCaretResetsToEnd)
             }
@@ -384,6 +387,7 @@ struct RootPaletteView: View {
             }
             .onChange(of: vm.query) {
                 if vm.collapseQueryLineBreaks() { return }
+                if !menuOpen, core.quickAICoordinator.openSkillsFromPalette() { return }
                 vm.selection = 0
                 scroll = ScrollIntent(kind: .top)
                 if vm.mode == .fileSearch {

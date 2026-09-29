@@ -31,16 +31,14 @@ final class QuickAICoordinator {
 
     func skillMenu(for input: String) -> PopoverMenuContent? {
         guard !palette.isComposing,
-            let command = AISkillCommand.parse(input, identifiers: skills.catalog?.identifiers ?? [])
+            let command = AISkillCommand.parse(
+                input, identifiers: skills.catalog?.identifiers ?? [],
+                shortcutEnabled: core.aiSettings.skillsShortcutEnabled)
         else { return nil }
         switch command {
-        case .command:
-            return PopoverMenuContent(header: nil, items: [
-                PopoverMenuItem(title: "Skills", systemImage: "sparkles") { [weak self] in
-                    self?.completeSkillCommand("/skills ")
-                }
-            ])
-        case .browse(let query):
+        case .command, .browse:
+            let query: String
+            if case .browse(let filter) = command { query = filter } else { query = "" }
             var items = (skills.catalog?.matching(query) ?? []).map { skill in
                 PopoverMenuItem(title: skill.name, icon: .symbol("sparkles"), detail: skill.summary) { [weak self] in
                     self?.completeSkillCommand("/skills \(skill.id) ")
@@ -66,8 +64,25 @@ final class QuickAICoordinator {
         }
     }
 
+    @discardableResult
+    func openSkillsFromPalette() -> Bool {
+        guard settings.aiEnabled, palette.mode != .ai, !palette.isComposing,
+            AISkillCommand.opensPalette(palette.query, shortcutEnabled: core.aiSettings.skillsShortcutEnabled)
+        else { return false }
+        let draft = palette.query
+        palette.query = ""
+        palette.push(mode: .ai)
+        palette.query = draft
+        palette.resetSearchCaretToEnd()
+        chatCoordinator.prepareForChat()
+        prepareSkills()
+        return true
+    }
+
     func isCompletingSkills(_ input: String) -> Bool {
-        AISkillCommand.parse(input, identifiers: skills.catalog?.identifiers ?? [])?.isCompletion == true
+        AISkillCommand.parse(
+            input, identifiers: skills.catalog?.identifiers ?? [],
+            shortcutEnabled: core.aiSettings.skillsShortcutEnabled)?.isCompletion == true
     }
 
     private func completeSkillCommand(_ value: String) {
@@ -96,7 +111,7 @@ final class QuickAICoordinator {
         }
         chat.startNewChat()
         paletteCoordinator.showPalette(mode: .ai)
-        if AISkillCommand.parse(prompt) != nil {
+        if AISkillCommand.parse(prompt, shortcutEnabled: core.aiSettings.skillsShortcutEnabled) != nil {
             palette.query = prompt
             prepareSkills()
             return

@@ -428,8 +428,13 @@ the pill's job, so the header never has to fit a third control beside the switch
 
 #### Skills
 
-Type `/` to see the Skills command, or `/skills` to list skills. Type part of a skill's name,
-identifier, or description to filter the list; arrows move the selection, and Return, Tab, or a
+With AI enabled, type `/` at the start of the command palette field to open the skills list
+from any view. This enters Quick AI, keeps the draft, and leaves a blank search in the view
+underneath so Back does not reopen the list. Settings → AI → Chat → Show Skills on / controls
+this shortcut and is on by default; disabling it also suppresses partial `/ski` suggestions in
+Quick AI. The explicit `/skills` command remains available. Marked IME text does not open skills.
+Type part of a skill's name, identifier, or description after `/skills` to filter the list;
+arrows move the selection, and Return, Tab, or a
 click chooses it. Selection inserts `/skills <identifier> ` and leaves the caret at the end for
 an optional task. Send without extra text to run the skill's own workflow. Searches containing
 spaces stay in the dropdown unless their first token is a known skill identifier. Escape clears
@@ -457,13 +462,17 @@ invocation stays in saved user text, letting rerun and regenerate resolve the sa
 loaded source. Follow-up messages without a slash invocation use automatic discovery. Quick
 Actions and the AI Chat window have no skills integration in this first phase.
 
-The reasoning control stays visible when the chat has a saved effort, even before discovery
-finishes, and states that saved effort. Codex retains its last known model metadata across a
-failed or malformed catalog response and unexpected helper exits; disconnected account state
-is still cleared. The effort menu offers Refresh Models when options are unavailable or stale.
+The reasoning control stays visible for a selected Codex model even when discovery has never
+succeeded and no effort is saved. Other routes retain it when an effort is saved or the catalog
+reports options. It states the saved effort, or Reasoning when the provider default applies.
+Codex retains its last known model metadata across failed or malformed catalog responses and
+unexpected helper exits; disconnected account state is still cleared. The effort menu offers Refresh Models when options are unavailable or stale.
 Disabling Codex or signing out clears the catalog. Reopening Quick AI prepares models again and
 retries a failed Codex connection. This keeps the existing effort choice separate from the
-availability of the process used to discover options.
+availability of the process used to discover options. Both the MCP listing probe and app-server
+launch prepend the resolved Codex executable's directory and standard package-manager directories
+to PATH, so npm/nvm launchers can find their sibling Node runtime when Oz starts from Finder.
+The listing still fails closed if external MCP servers cannot be identified and disabled.
 
 The second footer control is the palette's normal Actions (`⌘K`) menu. It owns Continue in AI Chat
 (`⌘J`; Open AI Chat while the chat is empty), New Chat (`⌘N`), Chat History (`⌘Y`) and AI Settings

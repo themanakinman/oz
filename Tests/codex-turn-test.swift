@@ -18,12 +18,14 @@ struct CodexTurnTests {
 
     static func main() async {
         if CommandLine.arguments.contains("--catalog") {
+            await appEnvironmentFindsCodexRuntime()
             await modelDiscoveryFailureKeepsReasoningOptions()
             await skillInstructionsAndEffortReachCodex()
             print("\(passes) passed, \(failures) failed")
             if failures > 0 { exit(1) }
             return
         }
+        await appEnvironmentFindsCodexRuntime()
         await modelDiscoveryFailureKeepsReasoningOptions()
         await skillInstructionsAndEffortReachCodex()
         await stopBeforeTurnStartedStillInterrupts()
@@ -47,6 +49,25 @@ struct CodexTurnTests {
 
         print("\(passes) passed, \(failures) failed")
         if failures > 0 { exit(1) }
+    }
+
+    static func appEnvironmentFindsCodexRuntime() async {
+        let originalPath = ProcessInfo.processInfo.environment["PATH"] ?? ""
+        defer { setenv("PATH", originalPath, 1) }
+        guard let server = StubServer(mode: "model-catalog", appEnvironment: true) else {
+            expect(false, "the app environment fixture starts")
+            return
+        }
+        defer { server.tearDown() }
+        do {
+            try await server.client.start()
+            let response = try await server.client.request(method: "model/list")
+            expect(response["data"]?.arrayValue?.count == 1,
+                "Finder's PATH can start Codex and load reasoning metadata")
+            expect(server.listed == 1, "MCP isolation still reads the real listing before launch")
+        } catch {
+            expect(false, "Finder's PATH can start Codex: \(error.localizedDescription)")
+        }
     }
 
     static func modelDiscoveryFailureKeepsReasoningOptions() async {
@@ -639,7 +660,7 @@ final class StubServer {
     let client: CodexAppServerClient
     let runner: CodexTurnRunner
 
-    init?(mode: String) {
+    init?(mode: String, appEnvironment: Bool = false) {
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
             .appending(path: "codex-turn-\(UUID().uuidString)", directoryHint: .isDirectory)
         let executable = root.appending(path: "bin/codex")
@@ -657,7 +678,20 @@ final class StubServer {
 
         // The locator walks PATH, so the stub only sits in front of any real `codex`.
         let inherited = ProcessInfo.processInfo.environment["PATH"] ?? ""
-        setenv("PATH", "\(executable.deletingLastPathComponent().path):\(inherited)", 1)
+        if appEnvironment {
+            let bin = executable.deletingLastPathComponent()
+            guard let node = inherited.split(separator: ":").map({
+                URL(fileURLWithPath: String($0)).appending(path: "node")
+            }).first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) else { return nil }
+            do {
+                try FileManager.default.createSymbolicLink(at: bin.appending(path: "node"), withDestinationURL: node)
+                try "export PATH=\(CodexMCPLaunch.quoted(bin.path)):/usr/bin:/bin:/usr/sbin:/sbin\n".write(
+                    to: root.appending(path: ".zshrc"), atomically: true, encoding: .utf8)
+            } catch { return nil }
+            setenv("PATH", "/usr/bin:/bin:/usr/sbin:/sbin", 1)
+        } else {
+            setenv("PATH", "\(executable.deletingLastPathComponent().path):\(inherited)", 1)
+        }
         // The locator asks a login shell first; the user's rc files would put a real `codex` ahead.
         setenv("ZDOTDIR", root.path, 1)
         setenv("TC_STUB_ROOT", root.path, 1)
