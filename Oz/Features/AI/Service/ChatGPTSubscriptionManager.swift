@@ -14,6 +14,7 @@ final class ChatGPTSubscriptionManager {
     private(set) var phase = ChatGPTSubscription.Phase.idle
     private(set) var account: ChatGPTSubscription.Account?
     private(set) var models: [ChatGPTSubscription.Model] = []
+    private(set) var modelCatalogError: String?
     private(set) var rateLimits: ChatGPTSubscription.RateLimits?
 
     @ObservationIgnored private var operationTask: Task<Void, Never>?
@@ -34,7 +35,8 @@ final class ChatGPTSubscriptionManager {
             self?.handleNotification(method: method, params: params)
         }
         client.onExit = { [weak self] message in
-            self?.forget()
+            self?.disconnect()
+            self?.modelCatalogError = message
             self?.phase = .failed(message)
         }
     }
@@ -132,7 +134,10 @@ final class ChatGPTSubscriptionManager {
         do {
             let response = try await client.request(
                 method: "model/list", params: ["includeHidden": false, "limit": 100])
-            models = (response["data"]?.arrayValue ?? []).compactMap { value in
+            guard let catalog = response["data"]?.arrayValue else {
+                throw AIProviderError.responseFailed("Codex returned no model catalog.")
+            }
+            models = catalog.compactMap { value in
                 guard let raw = value.objectValue, let id = raw["model"]?.stringValue else {
                     return nil
                 }
@@ -151,8 +156,9 @@ final class ChatGPTSubscriptionManager {
                     defaultEffort: raw["defaultReasoningEffort"]?.stringValue,
                     isDefault: raw["isDefault"]?.boolValue ?? false)
             }
+            modelCatalogError = nil
         } catch {
-            models = []
+            modelCatalogError = Self.userFacing(error).localizedDescription
         }
         await loadRateLimits()
     }
@@ -208,8 +214,13 @@ final class ChatGPTSubscriptionManager {
     }
 
     private func forget() {
-        account = nil
+        disconnect()
         models = []
+        modelCatalogError = nil
+    }
+
+    private func disconnect() {
+        account = nil
         rateLimits = nil
         turns.reset()
     }
@@ -217,8 +228,9 @@ final class ChatGPTSubscriptionManager {
     private func apply(_ error: Error) {
         // A cancelled check has no verdict: whoever cancelled it already set the state it wanted.
         guard !Task.isCancelled else { return }
-        forget()
+        disconnect()
         let message = Self.userFacing(error).localizedDescription
+        modelCatalogError = message
         if let clientError = error as? CodexAppServerClient.ClientError,
             case .executableMissing = clientError
         {

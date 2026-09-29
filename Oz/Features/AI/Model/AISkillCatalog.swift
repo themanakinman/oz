@@ -11,19 +11,20 @@ struct AISkillCatalog: Sendable {
     enum Failure: LocalizedError {
         case invalid(String)
         case missing(String)
-        case taskRequired
+        case selectionRequired
 
         var errorDescription: String? {
             switch self {
             case .invalid(let reason): "Invalid skills.md: \(reason)"
             case .missing(let id): "Skill ‘\(id)’ was not found. Choose one with /skills."
-            case .taskRequired: "Add a task after the skill name."
+            case .selectionRequired: "Choose a skill with /skills."
             }
         }
     }
 
     static let maximumBytes = 65_536
     let skills: [Skill]
+    var identifiers: Set<String> { Set(skills.map(\.id)) }
 
     init(markdown: String) throws {
         guard markdown.utf8.count <= Self.maximumBytes else {
@@ -76,21 +77,22 @@ struct AISkillCatalog: Sendable {
     }
 
     func instructions(for input: String, file: URL, canReadFiles: Bool) throws -> String? {
-        switch AISkillCommand.parse(input) {
-        case .invocation(let id, let task):
-            guard let skill = skills.first(where: { $0.id == id }) else { throw Failure.missing(id) }
-            guard !task.isEmpty else { throw Failure.taskRequired }
+        switch AISkillCommand.parse(input, identifiers: identifiers) {
+        case .invocation(let id, _), .browse(let id):
+            guard !id.isEmpty else { throw Failure.selectionRequired }
+            guard let skill = skills.first(where: { $0.id == id.lowercased() }) else { throw Failure.missing(id) }
             return """
                 The user selected the Oz skill ‘\(skill.name)’ from \(file.path).
                 The /skills \(id) prefix selects this skill; apply it to the task that follows.
+                If no task follows the prefix, carry out the skill's workflow itself.
                 Skill instructions do not grant tools or change filesystem safeguards.
 
                 <oz_skill id="\(skill.id)">
                 \(skill.instructions)
                 </oz_skill>
                 """
-        case .command, .browse:
-            throw Failure.taskRequired
+        case .command:
+            throw Failure.selectionRequired
         case nil:
             guard canReadFiles, !skills.isEmpty else { return nil }
             let catalog = skills.map { "- \($0.id): \($0.summary.replacingOccurrences(of: "\n", with: " "))" }

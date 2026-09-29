@@ -736,7 +736,7 @@ struct RootPaletteView: View {
                     icon: core.aiChatCoordinator.selectedModelIcon(for: quickAI),
                     isOpen: openMenu == .aiModel,
                     action: toggleAIModel)
-                if !core.aiChatCoordinator.reasoningEfforts(for: quickAI).isEmpty {
+                if core.aiChatCoordinator.showsReasoningControl(for: quickAI) {
                     headerGutter(width: metrics.spacing.md)
                     AIReasoningButton(
                         title: core.aiChatCoordinator.selectedReasoningTitle(for: quickAI),

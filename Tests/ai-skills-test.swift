@@ -42,6 +42,7 @@ struct AISkillTests {
             Follow its entry point and data flow.
             """
         let catalog = try AISkillCatalog(markdown: markdown)
+        let parse: (String) -> AISkillCommand? = { AISkillCommand.parse($0, identifiers: catalog.identifiers) }
         expect(catalog.skills.count == 2, "Only unfenced level-two headings define skills")
         expect(catalog.skills[0].id == "review-changes", "Names produce stable slash identifiers")
         expect(catalog.skills[0].summary == "Find bugs in the diff.", "First paragraph describes the skill")
@@ -58,17 +59,19 @@ struct AISkillTests {
         rejects(String(repeating: "x", count: 65_537))
         rejects((0..<65).map { "## Skill \($0)\nBody" }.joined(separator: "\n"))
 
-        expect(AISkillCommand.parse("/") == .command, "Slash opens the command suggestion")
-        expect(AISkillCommand.parse("/ski") == .command, "Partial commands remain completable")
-        expect(AISkillCommand.parse("/skills") == .browse(""), "Full command opens the catalog")
-        expect(AISkillCommand.parse("/skills ") == .browse(""), "Space after command keeps suggestions")
-        expect(AISkillCommand.parse("/skills rev") == .browse("rev"), "A partial identifier filters skills")
-        expect(AISkillCommand.parse("/skills review-changes ") == .invocation(id: "review-changes", task: ""),
+        expect(parse("/") == .command, "Slash opens the command suggestion")
+        expect(parse("/ski") == .command, "Partial commands remain completable")
+        expect(parse("/skills") == .browse(""), "Full command opens the catalog")
+        expect(parse("/skills ") == .browse(""), "Space after command keeps suggestions")
+        expect(parse("/skills rev") == .browse("rev"), "A partial identifier filters skills")
+        expect(parse("/skills review changes") == .browse("review changes"),
+            "A full skill name with spaces keeps the dropdown open")
+        expect(parse("/skills review-changes ") == .invocation(id: "review-changes", task: ""),
             "Selection closes completion and leaves room for the task")
-        expect(AISkillCommand.parse(" /skills EXPLAIN-CODE explain this ") == .invocation(
+        expect(parse(" /skills EXPLAIN-CODE explain this ") == .invocation(
             id: "explain-code", task: "explain this"), "Invocation separates identifier and task")
         for text in ["", "ordinary text", "explain /skills", "/Users/j/project", "/skills-other", "/s task"] {
-            expect(AISkillCommand.parse(text) == nil, "Ordinary text and file paths stay ordinary text")
+            expect(parse(text) == nil, "Ordinary text and file paths stay ordinary text")
         }
 
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -85,7 +88,12 @@ struct AISkillTests {
         expect(automatic?.contains("Read the surrounding code") == false, "Automatic discovery sends summaries")
         let disabled = try catalog.instructions(for: "review this", file: file, canReadFiles: false)
         expect(disabled == nil, "Text-only ordinary requests get no unusable file discovery")
-        for input in ["/skills", "/skills unknown do this", "/skills review-changes "] {
+        let skillOnly = try catalog.instructions(for: "/skills review-changes ", file: file, canReadFiles: false)
+        expect(skillOnly?.contains("Read the surrounding code") == true,
+            "Selecting a skill can run its workflow without extra task text")
+        let replayedSkill = try catalog.instructions(for: "/skills review-changes", file: file, canReadFiles: false)
+        expect(replayedSkill == skillOnly, "Trimmed saved invocations reapply the selected skill")
+        for input in ["/skills", "/skills unknown do this"] {
             do {
                 _ = try catalog.instructions(for: input, file: file, canReadFiles: true)
                 preconditionFailure("Incomplete or unknown selection was sent")
@@ -106,6 +114,14 @@ struct AISkillTests {
         expect(store.catalog?.skills.count == 2 && store.error == nil, "Refresh loads and coalesces callers")
         let routed = try store.instructions(for: "/skills review-changes task", canReadFiles: false)
         expect(routed == explicit, "The store and direct catalog use the same request instructions")
+        store.refresh()
+        var sendsDuringRefresh = false
+        do {
+            sendsDuringRefresh = try store.instructions(
+                for: "/skills review-changes task", canReadFiles: false) == explicit
+        } catch {}
+        expect(sendsDuringRefresh, "A selected, loaded skill stays usable during a background refresh")
+        while store.isLoading { await Task.yield() }
         try Data("## Broken".utf8).write(to: file)
         store.refresh()
         while store.isLoading { await Task.yield() }

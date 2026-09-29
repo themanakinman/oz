@@ -211,6 +211,20 @@ for (;;) {
         emit({ id: requestID, result: {} });
     } else if (!initialized && requestID !== undefined && requestID !== null) {
         emit({ id: requestID, error: { code: -32600, message: "Not initialized" } });
+    } else if (method === "account/read" && MODE === "model-catalog") {
+        if (fs.existsSync(path.join(ROOT, "helper-quit"))) process.exit(1);
+        emit({ id: requestID, result: { account: { type: "chatgpt", planType: "plus" } } });
+    } else if (method === "model/list" && MODE === "model-catalog") {
+        if (fs.existsSync(path.join(ROOT, "models-fail"))) {
+            emit({ id: requestID, error: { code: -32000, message: "Temporary model discovery failure" } });
+        } else if (fs.existsSync(path.join(ROOT, "models-malformed"))) {
+            emit({ id: requestID, result: {} });
+        } else {
+            emit({ id: requestID, result: { data: [{
+                model: "gpt-6-luna", displayName: "GPT-6-Luna", defaultReasoningEffort: "low",
+                supportedReasoningEfforts: [{ reasoningEffort: "low" }, { reasoningEffort: "high" }]
+            }] } });
+        }
     } else if (method === "thread/start") {
         record(`thread-params:${JSON.stringify(message.params ?? {})}`);
         threads += 1;

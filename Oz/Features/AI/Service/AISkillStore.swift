@@ -34,7 +34,7 @@ final class AISkillStore {
 
     func instructions(for input: String, canReadFiles: Bool) throws -> String? {
         if catalog == nil, error == nil, !isLoading { refresh() }
-        if AISkillCommand.parse(input) != nil, catalog == nil || isLoading {
+        if AISkillCommand.parse(input) != nil, catalog == nil {
             throw AISkillCatalog.Failure.invalid(error ?? "skills are loading; try again in a moment.")
         }
         if let catalog { return try catalog.instructions(for: input, file: file, canReadFiles: canReadFiles) }
@@ -70,7 +70,7 @@ final class AISkillStore {
 
         Each ## heading defines a skill. Its first paragraph describes when to use it;
         the rest contains its instructions. Edit this file to add or change skills.
-        Choose a skill with /skills in Quick AI, then type the task.
+        Choose a skill with /skills in Quick AI. Add task text to tailor its workflow, or send as is.
 
         ## Review changes
 

@@ -30,7 +30,9 @@ final class QuickAICoordinator {
     }
 
     func skillMenu(for input: String) -> PopoverMenuContent? {
-        guard !palette.isComposing, let command = AISkillCommand.parse(input) else { return nil }
+        guard !palette.isComposing,
+            let command = AISkillCommand.parse(input, identifiers: skills.catalog?.identifiers ?? [])
+        else { return nil }
         switch command {
         case .command:
             return PopoverMenuContent(header: nil, items: [
@@ -62,6 +64,10 @@ final class QuickAICoordinator {
         case .invocation:
             return nil
         }
+    }
+
+    func isCompletingSkills(_ input: String) -> Bool {
+        AISkillCommand.parse(input, identifiers: skills.catalog?.identifiers ?? [])?.isCompletion == true
     }
 
     private func completeSkillCommand(_ value: String) {

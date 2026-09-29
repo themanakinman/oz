@@ -431,7 +431,9 @@ the pill's job, so the header never has to fit a third control beside the switch
 Type `/` to see the Skills command, or `/skills` to list skills. Type part of a skill's name,
 identifier, or description to filter the list; arrows move the selection, and Return, Tab, or a
 click chooses it. Selection inserts `/skills <identifier> ` and leaves the caret at the end for
-the task. Escape clears the composer using the palette's normal behavior. The dropdown uses
+an optional task. Send without extra text to run the skill's own workflow. Searches containing
+spaces stay in the dropdown unless their first token is a known skill identifier. Escape clears
+the composer using the palette's normal behavior. The dropdown uses
 `PopoverMenu` without a second search field, so the composer stays editable.
 
 “Edit skills.md” opens the shared source in the user's default editor. In Oz Dev it lives at
@@ -441,18 +443,27 @@ are preserved. Each `## Name` heading defines a skill; the first paragraph descr
 and the entire section is its instructions. Level-three headings and fenced code remain in the
 body. Names become unique lowercase identifiers with hyphens. The file is UTF-8, capped at 64 KB,
 64 skills, 80 characters per name, and 16 KB per skill body. Invalid files show an error in the
-dropdown and clear the loaded catalog; explicit unknown or incomplete selections fail before
+dropdown and clear the loaded catalog; explicit unknown selections fail before
 calling the model.
 
 `AISkillCatalog` owns parsing and instruction composition; `AISkillCommand` owns slash parsing;
 `AISkillStore` owns off-main loading. The catalog refreshes on opening Quick AI, entering slash
-completion, and returning to Oz from an editor. Explicit selection injects the selected body for
+completion, and returning to Oz from an editor. An already loaded skill remains usable during
+refresh; a detected invalid edit still clears the catalog. Explicit selection injects the selected body for
 every Quick AI provider, including text-only models and requests with Files off. With Files on,
 ordinary Quick AI requests receive skill summaries and the source path so the model can read a
 matching section autonomously. This is guidance, not a separate permission policy. The slash
 invocation stays in saved user text, letting rerun and regenerate resolve the same skill from the
 loaded source. Follow-up messages without a slash invocation use automatic discovery. Quick
 Actions and the AI Chat window have no skills integration in this first phase.
+
+The reasoning control stays visible when the chat has a saved effort, even before discovery
+finishes, and states that saved effort. Codex retains its last known model metadata across a
+failed or malformed catalog response and unexpected helper exits; disconnected account state
+is still cleared. The effort menu offers Refresh Models when options are unavailable or stale.
+Disabling Codex or signing out clears the catalog. Reopening Quick AI prepares models again and
+retries a failed Codex connection. This keeps the existing effort choice separate from the
+availability of the process used to discover options.
 
 The second footer control is the palette's normal Actions (`⌘K`) menu. It owns Continue in AI Chat
 (`⌘J`; Open AI Chat while the chat is empty), New Chat (`⌘N`), Chat History (`⌘Y`) and AI Settings

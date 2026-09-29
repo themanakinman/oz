@@ -177,12 +177,14 @@ struct AIScreen: PaletteScreen {
                 }
             }
             .onChange(of: vm.query) { previous, current in
-                if AISkillCommand.parse(current)?.isCompletion == true,
-                    AISkillCommand.parse(previous)?.isCompletion != true {
+                if coordinator.isCompletingSkills(current), !coordinator.isCompletingSkills(previous) {
                     coordinator.prepareSkills()
                 }
             }
-            .onChange(of: vm.focusToken) { coordinator.prepareSkills() }
+            .onChange(of: vm.focusToken) {
+                chatCoordinator.prepareForChat()
+                coordinator.prepareSkills()
+            }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                 coordinator.prepareSkills()
             })

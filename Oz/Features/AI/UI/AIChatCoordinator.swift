@@ -718,6 +718,10 @@ final class AIChatCoordinator {
 
     /// Fetches the list so the title is a name, and a default can resolve without Settings.
     func warmUpModelList() {
+        if core.aiSettings.enabledInstalledProviders.contains(.codex),
+            case .failed = core.chatGPTSubscription.phase {
+            core.chatGPTSubscription.refresh()
+        }
         guard let stored = core.aiSettings.defaultModel else {
             prepareModelSwitcher()
             core.aiSettings.resolveDefaultModel()
@@ -742,11 +746,28 @@ final class AIChatCoordinator {
             subscription: core.chatGPTSubscription, installedAI: core.installedAI)
     }
 
+    func showsReasoningControl(for chat: AIChatState) -> Bool {
+        model(for: chat)?.effort != nil || !reasoningEfforts(for: chat).isEmpty
+    }
+
+    func reasoningOptionsNeedRefresh(for chat: AIChatState) -> Bool {
+        model(for: chat)?.source == .codex && core.chatGPTSubscription.modelCatalogError != nil
+    }
+
     func selectedReasoningTitle(for chat: AIChatState) -> String {
-        guard let selected = model(for: chat)?.effort,
-            let effort = reasoningEfforts(for: chat).first(where: { $0.id == selected })
-        else { return "Reasoning" }
-        return effort.title
+        guard let selected = model(for: chat)?.effort else { return "Reasoning" }
+        return ChatGPTSubscription.Effort(id: selected, detail: nil).title
+    }
+
+    func refreshReasoningOptions(for chat: AIChatState) {
+        switch model(for: chat)?.source {
+        case .codex:
+            if core.aiSettings.enabledInstalledProviders.contains(.codex) { core.chatGPTSubscription.refresh() }
+        case .claude, .grok, .openCode, .cursor:
+            if let kind = model(for: chat)?.source.installedKind { core.installedAI.refresh(kind: kind) }
+        case .api, .appleIntelligence, nil:
+            prepareModelSwitcher()
+        }
     }
 
     func selectReasoningEffort(_ effort: ChatGPTSubscription.Effort, in chat: AIChatState) {
