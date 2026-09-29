@@ -10,7 +10,7 @@ A native macOS launcher built with SwiftUI and AppKit. Search apps, files, and c
 
 - **Launcher and files** — Drag file results from the launcher or File Search into other apps; refined result presentation and selection.
 - **Keyboard flow** — Improved palette input, shortcuts, and navigation across screens.
-- **AI chat** — Thinking status, smoother transcript scrolling, and a shortcut to chat history.
+- **AI chat** — Quick AI in the palette and a dedicated chat window with saved conversations, find, attachments, and per-chat models. Press ⌘J to continue Quick AI in the window.
 - **Quicklinks** — Improved icon rendering and caching.
 - **Palette polish** — Clearer action placement, smoother menus, and blurred content behind submenus.
 

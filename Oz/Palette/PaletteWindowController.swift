@@ -137,8 +137,8 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
     private func attachPastedFile() -> Bool {
         let files = PasteboardFiles.urls(on: .general)
         switch core.palette.mode {
-        case .ai: return core.aiChatCoordinator.attachPastedFile(files: files)
-        case .launcher: return core.aiChatCoordinator.attachPastedFileFromLauncher(files: files)
+        case .ai: return core.quickAICoordinator.attachPastedFile(files: files)
+        case .launcher: return core.quickAICoordinator.attachPastedFileFromLauncher(files: files)
         default: return false
         }
     }
@@ -335,7 +335,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
                 core.extensionCoordinator.exitExtensionScreen()
                 return true
             }
-            if core.palette.mode == .ai, core.aiChatCoordinator.removeLastAttachment() {
+            if core.palette.mode == .ai, core.quickAICoordinator.removeLastAttachment() {
                 return true
             }
             if core.palette.pop() { return true }
@@ -365,12 +365,13 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
                     == [.command, .shift]
                 switch (character, isShifted) {
                 case ("n", false):
-                    self.core.aiChatCoordinator.startNewChat()
+                    self.core.quickAICoordinator.startNewChat()
                     return true
-                case ("n", true):
-                    return self.core.aiChatCoordinator.copyLastResponse()
-                case ("h", true):
-                    self.core.aiChatCoordinator.showHistory()
+                case ("n", true), ("c", true):
+                    self.core.quickAICoordinator.copyLastResponse()
+                    return true
+                case ("h", true), ("y", false):
+                    self.core.quickAICoordinator.showHistory()
                     return true
                 default:
                     break

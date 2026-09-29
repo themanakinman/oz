@@ -265,7 +265,8 @@ enum SettingsSearchCatalog {
     ]
 
     private static let ai: [SettingsSearchEntry] = [
-        .init(pane: .ai, keywords: ["chat", "llm", "model", "openai", "anthropic"]),
+        .init(
+            pane: .ai, keywords: ["chat", "quick ai", "llm", "model", "openai", "anthropic"]),
         .init(.aiAI, "Enable AI", keywords: ["chat", "llm"]),
         .init(
             .aiProviders, "Providers",
@@ -276,9 +277,10 @@ enum SettingsSearchCatalog {
         .init(.aiDefault, "Default model", keywords: ["llm", "gpt", "claude", "grok"]),
         .init(.aiDefault, "Reasoning effort", keywords: ["thinking", "effort", "deepseek"]),
         .init(.aiChat, "Web search", keywords: ["browse", "internet"]),
+        .init(.aiChat, "Tool call rounds", keywords: ["mcp", "tools", "limit", "loop", "agent", "unlimited"]),
         .init(
-            .aiConversations, "Opens to",
-            keywords: ["new chat", "last", "summon"]),
+            .aiConversations, "Quick AI opens to",
+            keywords: ["new chat", "last", "summon", "resume"]),
         .init(
             .aiConversations, "Start a new conversation after",
             keywords: ["idle", "timeout", "fresh"]),

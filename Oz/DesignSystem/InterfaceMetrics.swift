@@ -17,7 +17,7 @@ struct InterfaceMetrics: Equatable, Sendable {
     var size: Size { Size(scale: scale) }
     var typography: Typography { Typography(scale: scale) }
 
-    /// Palette surfaces use this copy; standalone windows keep the user's standard radii.
+    /// The palette and AI Chat use this copy; other windows keep the standard radii.
     func withSquareCorners() -> Self { Self(scale: scale, radiusOverride: 0) }
 
     /// For a tuned length a surface owns itself, where `Theme` states no token for it.
@@ -40,6 +40,7 @@ struct InterfaceMetrics: Equatable, Sendable {
         var emojiSectionSpacing: CGFloat { scaledPoints(Theme.Spacing.emojiSectionSpacing, scale) }
         var chatTranscriptBottom: CGFloat { scaledPoints(Theme.Spacing.chatTranscriptBottom, scale) }
         var chatFollowTailSlack: CGFloat { scaledPoints(Theme.Spacing.chatFollowTailSlack, scale) }
+        var chatLine: CGFloat { scaledPoints(Theme.Spacing.chatLine, scale) }
     }
 
     struct Radius: Equatable, Sendable {
@@ -85,6 +86,7 @@ struct InterfaceMetrics: Equatable, Sendable {
         var launcherPanelHeight: CGFloat { scaledPoints(Theme.Size.launcherPanelHeight, scale) }
         var headerHeight: CGFloat { scaledPoints(Theme.Size.headerHeight, scale) }
         var headerIconSlot: CGFloat { scaledPoints(Theme.Size.headerIconSlot, scale) }
+        var searchFieldMinWidth: CGFloat { scaledPoints(Theme.Size.searchFieldMinWidth, scale) }
         var headerPadding: CGFloat { scaledPoints(Theme.Size.headerPadding, scale) }
         /// Derived, not scaled: the compact bar must stay exactly the header in symmetric slack.
         var compactHeight: CGFloat { headerHeight + headerPadding * 2 }
@@ -200,6 +202,16 @@ struct InterfaceMetrics: Equatable, Sendable {
         var menuRow: Font { font(Theme.Typography.menuRow, .body) }
         var menuShortcut: Font { font(Theme.Typography.menuShortcut, .callout) }
         var menuIcon: Font { font(Theme.Typography.menuIcon, .body) }
+
+        /// The AppKit twin of a text style, for text an `NSTextView` draws beside SwiftUI's own.
+        func textNSFont(
+            _ style: NSFont.TextStyle, weight: NSFont.Weight? = nil, monospaced: Bool = false
+        ) -> NSFont {
+            let base = nsFont(style)
+            if monospaced { return .monospacedSystemFont(ofSize: base.pointSize, weight: weight ?? .regular) }
+            guard let weight else { return base }
+            return .systemFont(ofSize: base.pointSize, weight: weight)
+        }
 
         /// Composed like `Theme`'s own: the style carries the face, an explicit weight overrides it.
         private func font(

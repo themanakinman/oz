@@ -5,19 +5,27 @@ struct InstalledAIStreamFrame: Equatable, Sendable {
     var sessionID: String?
     var error: String?
     var completed = false
+    /// A tool call the CLI is holding open; the runner answers it and the turn carries on.
+    var controlRequest: ClaudeControlProtocol.Request?
+    var unsupportedRequestID: String?
+    /// The round cap ended the turn. Only the runner knows the number to say it with.
+    var stoppedAtRoundCap = false
 }
 
 enum InstalledAIStreamDecoder {
-    static func decode(_ data: Data, kind: InstalledAIKind) -> InstalledAIStreamFrame {
+    static func decode(
+        _ data: Data, kind: InstalledAIKind, servers: [AIToolServer] = []
+    ) -> InstalledAIStreamFrame {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
             let type = object["type"] as? String
         else { return InstalledAIStreamFrame() }
         switch kind {
         case .openCode: return openCode(object, type: type)
-        case .claude: return claude(object, type: type)
+        case .claude: return claude(object, type: type, servers: servers)
         case .cursor: return cursor(object, type: type)
         case .grok:
-            var frame = claude(object, type: type)
+            // Grok shares the frame shape but never the tools: `--deny *` refuses every call.
+            var frame = claude(object, type: type, servers: [])
             frame.sessionID = object["session_id"] as? String
             return frame
         case .codex: return InstalledAIStreamFrame()
@@ -52,9 +60,26 @@ enum InstalledAIStreamDecoder {
     }
 
     private static func claude(
-        _ object: [String: Any], type: String
+        _ object: [String: Any], type: String, servers: [AIToolServer]
     ) -> InstalledAIStreamFrame {
         var frame = InstalledAIStreamFrame()
+        if !servers.isEmpty, type == "control_request" {
+            frame.controlRequest = ClaudeControlProtocol.request(object)
+            frame.unsupportedRequestID = ClaudeControlProtocol.unsupportedRequestID(object)
+            return frame
+        }
+        if !servers.isEmpty, type == "assistant" || type == "user" {
+            frame.events = toolEvents(in: object, servers: servers)
+            return frame
+        }
+        // Summaries arrive as several thinking blocks; a break keeps them from running together.
+        if type == "stream_event", let event = object["event"] as? [String: Any],
+            event["type"] as? String == "content_block_start",
+            (event["content_block"] as? [String: Any])?["type"] as? String == "thinking"
+        {
+            frame.events = [.thinking, .reasoning("\n\n")]
+            return frame
+        }
         if type == "stream_event", let event = object["event"] as? [String: Any],
             let delta = event["delta"] as? [String: Any]
         {
@@ -64,26 +89,77 @@ enum InstalledAIStreamDecoder {
                     frame.events = [.text(text)]
                 }
             case "thinking_delta":
-                frame.events = [.thinking]
+                let thinking = delta["thinking"] as? String ?? ""
+                frame.events = thinking.isEmpty ? [.thinking] : [.thinking, .reasoning(thinking)]
             default:
                 break
             }
             return frame
         }
         guard type == "result" else { return frame }
+        // The cap's own subtype comes with an empty `result`, so it is read before the error is.
+        if object["subtype"] as? String == "error_max_turns" {
+            frame.stoppedAtRoundCap = true
+            return frame
+        }
         if object["is_error"] as? Bool == true {
             frame.error = object["result"] as? String ?? "Claude could not finish the response."
             return frame
         }
         if let usage = object["usage"] as? [String: Any] {
-            frame.events.append(
-                .usage(
-                    AIUsage(
-                        inputTokens: integer(usage["input_tokens"]),
-                        outputTokens: integer(usage["output_tokens"]))))
+            frame.events.append(.usage(claudeUsage(usage, result: object)))
         }
         frame.completed = true
         return frame
+    }
+
+    /// `tool_use` and `tool_result` blocks, as the two events a transcript row is built from.
+    private static func toolEvents(
+        in object: [String: Any], servers: [AIToolServer]
+    ) -> [AIStreamEvent] {
+        guard let message = object["message"] as? [String: Any],
+            let content = message["content"] as? [[String: Any]]
+        else { return [] }
+        return content.compactMap { block in
+            switch block["type"] as? String {
+            case "tool_use":
+                guard let id = block["id"] as? String, let name = block["name"] as? String,
+                    let call = ClaudeMCPLaunch.route(name)
+                else { return nil }
+                return .toolCall(
+                    id: id, origin: AIToolServerRow.title(of: call.handle, in: servers),
+                    title: AIToolServerRow.label(call.tool))
+            case "tool_result":
+                guard let id = block["tool_use_id"] as? String else { return nil }
+                return .toolResult(id: id, isError: block["is_error"] as? Bool == true)
+            default:
+                return nil
+            }
+        }
+    }
+
+    /// Cached prompt tokens sit outside `input_tokens`, and only `modelUsage` names the window.
+    private static func claudeUsage(_ usage: [String: Any], result: [String: Any]) -> AIUsage {
+        let cached = [usage["cache_read_input_tokens"], usage["cache_creation_input_tokens"]]
+            .compactMap(integer)
+        let details = usage["output_tokens_details"] as? [String: Any]
+        // A side model (Haiku) may share the turn; the conversation's read the largest prompt.
+        let model = (result["modelUsage"] as? [String: Any])?.values
+            .compactMap { $0 as? [String: Any] }
+            .max { rank($0) < rank($1) }
+        return AIUsage(
+            inputTokens: integer(usage["input_tokens"]),
+            outputTokens: integer(usage["output_tokens"]),
+            cachedInputTokens: cached.isEmpty ? nil : cached.reduce(0, +),
+            reasoningTokens: integer(details?["thinking_tokens"]),
+            contextWindow: integer(model?["contextWindow"]),
+            costUSD: (result["total_cost_usd"] as? NSNumber)?.doubleValue)
+    }
+
+    private static func rank(_ model: [String: Any]) -> (prompt: Int, window: Int) {
+        let prompt = ["inputTokens", "cacheReadInputTokens", "cacheCreationInputTokens"]
+            .compactMap { integer(model[$0]) }.reduce(0, +)
+        return (prompt, integer(model["contextWindow"]) ?? 0)
     }
 
     private static func cursor(

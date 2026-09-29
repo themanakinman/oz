@@ -508,21 +508,47 @@ run ai-provider-test       Oz/Features/Settings/AppSettingsKey.swift \
                            Oz/Features/AI/Model/*.swift \
                            Oz/Features/AI/Settings/AISettingsStore.swift
 run ai-chat-test           Oz/Features/AI/Model/AIRequest.swift \
+                           Oz/Features/AI/Model/AIConnection.swift \
+                           Oz/Features/AI/Model/AppleIntelligence.swift \
                            Oz/Features/AI/Model/AIAttachmentPolicy.swift \
                            Oz/Features/AI/Model/AIRetention.swift \
                            Oz/Features/AI/Model/AITool.swift \
                            Oz/Features/AI/Model/JSONValue.swift \
                            Oz/Features/AI/Model/ChatMessage.swift \
                            Oz/Features/AI/Model/ChatSession.swift \
+                           Oz/Features/AI/Model/ChatChoices.swift \
+                           Oz/Features/AI/Model/ChatReferences.swift \
+                           Oz/Features/AI/Model/ChatTitle.swift \
+                           Oz/Features/AI/Model/ChatFind.swift \
+                           Oz/Features/AI/Model/ChatCitations.swift \
+                           Oz/Features/AI/Model/ChatToolScope.swift \
                            Oz/Features/AI/Model/MarkdownBlock.swift \
                            Oz/Features/AI/Service/AIProvider.swift \
                            Oz/Features/AI/Service/ChatHistoryStore.swift \
                            Oz/Features/AI/Service/AIToolLoopProvider.swift \
-                           Oz/Features/AI/UI/AIChatState.swift
+                           Oz/Features/AI/UI/AIChatState.swift \
+                           Oz/Features/AI/UI/AIChatSurfacesState.swift \
+                           Oz/Features/AI/UI/ChatFindState.swift
+run chat-markdown-test     Oz/Platform/Appearance.swift \
+                           Oz/DesignSystem/Theme.swift \
+                           Oz/DesignSystem/InterfaceMetrics.swift \
+                           Oz/Features/Settings/InterfaceSize.swift \
+                           Oz/Features/AI/Model/AIRequest.swift \
+                           Oz/Features/AI/Model/AITool.swift \
+                           Oz/Features/AI/Model/JSONValue.swift \
+                           Oz/Features/AI/Model/ChatMessage.swift \
+                           Oz/Features/AI/Model/ChatChoices.swift \
+                           Oz/Features/AI/Model/ChatReferences.swift \
+                           Oz/Features/AI/Model/ChatCitations.swift \
+                           Oz/Features/AI/Model/ChatFind.swift \
+                           Oz/Features/AI/Model/MarkdownBlock.swift \
+                           Oz/Features/AI/UI/ChatTextHighlight.swift \
+                           Oz/Features/AI/UI/ChatMarkdownRenderer.swift
 run mcp-test               Oz/Features/Settings/AppSettingsKey.swift \
                            Oz/Features/AI/Model/AIConnection.swift \
                            Oz/Features/AI/Model/AppleIntelligence.swift \
                            Oz/Features/AI/Model/AITool.swift \
+                           Oz/Features/AI/Model/AIToolServer.swift \
                            Oz/Features/AI/Model/JSONValue.swift \
                            Oz/Features/MCP/Model/*.swift \
                            Oz/Features/MCP/Settings/MCPSettingsStore.swift
@@ -539,12 +565,25 @@ run apple-intelligence-test Oz/Features/Settings/AppSettingsKey.swift \
                            Oz/Features/AI/Model/*.swift \
                            Oz/Features/AI/Service/AIProvider.swift \
                            Oz/Features/AI/Service/AppleIntelligenceProvider.swift
+run mcp-oauth-test         Oz/Platform/ExecutableLocator.swift \
+                           Oz/Platform/KeychainSecretStore.swift \
+                           Oz/Features/Settings/AppSettingsKey.swift \
+                           Oz/Features/AI/Model/AIConnection.swift \
+                           Oz/Features/AI/Model/AppleIntelligence.swift \
+                           Oz/Features/AI/Model/AITool.swift \
+                           Oz/Features/AI/Model/AIToolServer.swift \
+                           Oz/Features/AI/Model/AIStreamDecoder.swift \
+                           Oz/Features/AI/Model/AIRequest.swift \
+                           Oz/Features/AI/Model/JSONValue.swift \
+                           Oz/Features/MCP/Model/*.swift \
+                           Oz/Features/MCP/Service/*.swift
 run slow mcp-stdio-test    Oz/Platform/ExecutableLocator.swift \
                            Oz/Platform/KeychainSecretStore.swift \
                            Oz/Features/Settings/AppSettingsKey.swift \
                            Oz/Features/AI/Model/AIConnection.swift \
                            Oz/Features/AI/Model/AppleIntelligence.swift \
                            Oz/Features/AI/Model/AITool.swift \
+                           Oz/Features/AI/Model/AIToolServer.swift \
                            Oz/Features/AI/Model/AIStreamDecoder.swift \
                            Oz/Features/AI/Model/AIRequest.swift \
                            Oz/Features/AI/Model/JSONValue.swift \
@@ -555,6 +594,7 @@ run slow codex-turn-test   Oz/Platform/AppPaths.swift \
                            Oz/Features/AI/Service/AIProvider.swift \
                            Oz/Features/AI/Service/ChatGPTSubscriptionManager.swift \
                            Oz/Features/AI/Service/CodexAppServerClient.swift \
+                           Oz/Features/AI/Service/InstalledAIProbe.swift \
                            Oz/Platform/ExecutableLocator.swift \
                            Oz/Features/AI/Service/CodexTurnRunner.swift
 run installed-ai-test     Oz/Features/AI/Model/*.swift \
@@ -562,6 +602,7 @@ run installed-ai-test     Oz/Features/AI/Model/*.swift \
                           Oz/Platform/AppPaths.swift \
                           Oz/Platform/ExecutableLocator.swift \
                           Oz/Features/AI/Service/InstalledCLIProvider.swift \
+                          Oz/Features/AI/Service/InstalledAIProbe.swift \
                           Oz/Features/AI/Service/InstalledAIManager.swift
 
 if [ "$emit_db" -eq 1 ]; then

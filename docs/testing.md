@@ -131,15 +131,22 @@ If a change touches anything in the right column, the harness on the left is man
 | `backup-archive-test` | all of `Backup/Model/`, plus `Backup/Service/BackupStaging.swift` |
 | `updates-test` | `Updates/Model/` — version precedence, channel filtering, install route, readiness |
 | `support-test` | `Support/Model/` — when the support reminder comes due, and a clock moved backwards |
-| `mcp-test` | `MCP/Model/` and `MCPSettingsStore` — JSON-RPC framing, handles, tool names, output flattening, trust, `@server` addressing |
+| `mcp-test` | `MCP/Model/` and `MCPSettingsStore` — JSON-RPC framing, handles, tool names, output flattening, trust, `@server` addressing, the shape a vendor CLI is handed, and which servers Oz leaves to that CLI |
 | `mcp-stdio-test` | `MCP/Service/` against a stub server — handshake, listing, calling, and every way one can go away |
+| `mcp-oauth-test` | OAuth parsing, RFC 7636 PKCE, discovery and resource binding, loopback callback validation/cancellation, dynamic registration, supplied client credentials and their token-endpoint authentication, Keychain token rotation, concurrent refresh, the wider margin for a token lent to a CLI, redirects and one-retry 401 handling |
 
-The two harnesses that need a server to talk to bring their own: `Tests/ai-fixtures/codex-stub.js`
+The subprocess harnesses bring their own servers: `Tests/ai-fixtures/codex-stub.js`
 and `mcp-stub.js`, each copied into a scratch directory and put in front of PATH so the locator finds
 it the way it would find a real one. Both read fd 0 synchronously rather than through a stream —
 `codex-stub.js` stalls mid-turn on purpose, and an event loop would read the next line while it is
 still holding — and both write with `fs.writeSync`, so a reply is on the pipe before a mode that
-exits does.
+exits does. `installed-cli-stub.js` reads the same way for the one turn shape that answers back:
+Claude's consent channel is a reply on stdin in the middle of a turn, so the stub has to be sitting
+on the pipe when it arrives.
+
+`mcp-oauth-test` starts `Tests/ai-fixtures/mcp-oauth-stub.js` on `127.0.0.1:4963` and tests the
+single-use callback on `127.0.0.1:4962`. Both ports must be free; the harness never chooses another
+port. Its Keychain scope is unique to each run and removed on completion.
 
 A harness that passed before a change passes after it. There is no "I'll fix it next commit" and no
 commenting out a case. If a change genuinely invalidates an assertion, the assertion is rewritten in the
@@ -327,7 +334,7 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 
 - Palette hotkey opens the launcher; pressing it again closes it; Escape clears a non-empty query,
   then hides on a second press; clicking away closes it
-- Search a mode command (Clipboard History, Search Emoji, Search Quicklinks, Search Files, AI Chat)
+- Search a mode command (Clipboard History, Search Emoji, Search Quicklinks, Search Files, Quick AI)
   and run it: Escape returns to the launcher **with the query still typed and the row still
   selected**, and the next press clears it. The same screen from its own global hotkey hides the
   palette instead, and shows its own header icon rather than a back chevron

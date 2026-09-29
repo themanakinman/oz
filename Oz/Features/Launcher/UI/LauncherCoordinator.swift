@@ -158,8 +158,11 @@ final class LauncherCoordinator {
     /// The one funnel a built-in command runs through, from a palette row or its global shortcut.
     func runCommand(_ id: CommandID) {
         switch id {
+        case .quickAI:
+            core.quickAICoordinator.show()
         case .aiChat:
-            core.aiChatCoordinator.showChat()
+            dismissPalette()
+            core.aiChatCoordinator.toggleWindow()
         case .fixGrammar:
             core.quickActionCoordinator.run(.fixGrammar)
         case .rewrite:

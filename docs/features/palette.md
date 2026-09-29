@@ -85,7 +85,7 @@ palette returns to the launcher *and* chat starts a new conversation, at once or
 unfinished chat is a thing being done, exactly like a typed query, so the screen and the conversation
 are reset together rather than the screen alone. A reply still streaming is the one exception — it was
 asked for, and resetting would throw the answer away. Nothing is lost either way: a conversation is
-written to Chat History as soon as it has a message.
+written to Chat History, and the AI Chat window's sidebar, as soon as it has a message.
 
 Each `PaletteMode` maps to one type conforming to `PaletteScreen`, and the protocol is what keeps the
 selection invariant honest: a screen exposes `rows` as its single source of visible order, and the
@@ -160,13 +160,13 @@ pops, a root one closes — so `backHelp` says which, rather than promising a st
 a close. It lights to `textPrimary` under the pointer over `Theme.Duration.hover`, and
 `HeaderBackButton` keeps that hover state to itself so the header around it never re-renders.
 
-The launcher advertises the first hop in the header — `AI Chat` beside a `⇥` cap, the footer's own
-pairing of a label with its key. It is drawn only when Tab really would open chat, a condition read
+The launcher advertises the first hop in the header — `Quick AI` beside a `⇥` cap, the footer's own
+pairing of a label with its key. It is drawn only when Tab really would open Quick AI, a condition read
 back out of `PaletteTabAction` rather than restated, so a hint can never promise a destination the
 key does not go to: an argument field to walk takes Tab first, and the hint steps aside for it.
 
 `PaletteTabAction` decides where Tab goes *and* what happens to the typed text. The clipboard hands
-the query over, since one search narrows either list. **From the launcher, Tab `.ask`s** — chat opens
+the query over, since one search narrows either list. **From the launcher, Tab `.ask`s** — Quick AI opens
 fresh with the typed text already sent, so one key turns a search into a question. Leaving chat is
 still a `.freshScreen`: that field holds a half-written message rather than a query, and a draft
 dropped into a filter matches nothing. `.ask` is its own case rather than a `carryQuery(.ai)` because
@@ -192,7 +192,8 @@ these invariants:
 - The search field sits at **one structural position, always**. It is never moved inside an `if`:
   flipping the branch tears down its field editor, which drops first responder mid-navigation. Only
   its *width* changes — it is sized to its own text so the chips sit right after it, as they do in
-  Raycast.
+  Raycast. That width is a ceiling rather than a size, and the spacer after the strip is given room
+  last, so a long query is squeezed before the strip can run into the screen's own header controls.
 - **`Placement` is what a strip does to the field beside it.** `.afterQuery` (root search) drops the
   prompt and squeezes the field to the typed text, so the chips follow what was typed and a glyph
   anchors them to the row. `.besideSearchField` (a screen of its own, where that row is already

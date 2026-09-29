@@ -89,7 +89,7 @@ app: the stores (`AppIndex`, `ClipboardStore`, `SnippetsStore`, `QuicklinkStore`
 (`ClipboardManager`, the opt-in `ClipboardTextIndexer`,
 `HotKeyManager`, `HyperKeyTap`, `RunningAppsMonitor`, `SnippetKeywordListener`), the shared state
 (`AppSettings`, `PaletteState`, `FileSearchSession`, `MenuSearchSession`, `UninstallSession`,
-`MeetingClock`), `NotesStore`, the twenty feature coordinators, and the
+`MeetingClock`), `NotesStore`, the twenty-one feature coordinators, and the
 window controllers.
 
 `AppDelegate.applicationDidFinishLaunching` calls `AppCore.shared.start()` and nothing else. That is the
@@ -136,9 +136,16 @@ driven imperatively from AppKit. Extension menu extras are dynamic `NSStatusItem
   literal source, switches among local Markdown files and stays visible on focus loss. The displayed
   string is the canonical file source; there is no source/display mapping.
   See [features/notes.md](features/notes.md).
-- **The main menu** — shaped by `OzApp`'s `.commands`, which rebinds ⌘Q to Close Settings. It is
-  only ever on screen while a titled window is open, so it is Settings' menu bar. It must stay
-  declarative.
+- **AI Chat** — a borderless, resizable `AppWindowController` window owned by `AIChatCoordinator`.
+  `AIChatWindowView` draws the square palette surface around a transparent `NSSplitViewController`
+  with a collapsible chat sidebar. `AIChatWindowState` holds only presentation state for that window.
+  Its command toggles visibility without tearing down that state; hidden windows leave the activation
+  policy's visible-window set and rejoin it when shown.
+  The conversation lives on `AppCore.aiChats`, not the window, so closing it cancels
+  nothing. Quick AI is the same feature's palette screen. See [features/ai.md](features/ai.md).
+- **The main menu** — shaped by `OzApp`'s `.commands`, which rebinds ⌘Q to Close Window: the AI
+  Chat window when it is key, otherwise Settings. It is only ever on screen while a document window is
+  open, so it is those windows' menu bar. It must stay declarative.
 - **Dialogs** — borderless `DialogPanel`s driven by `DialogController`, the app's only presenter for
   confirmations, failure reports and value prompts. Presentation is `async`, so nothing blocks the main
   actor, and the presenter refuses a second dialog while one is up — that, not a flag, is what stops a
