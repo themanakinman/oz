@@ -376,7 +376,7 @@ struct RootPaletteView: View {
                 searchFocused = !screen.hidesSearchField
             }
             .onChange(of: vm.searchCaretResetToken) {
-                (hostWindow as? PalettePanel)?.resetFieldEditorCursorToBeginning()
+                (hostWindow as? PalettePanel)?.resetFieldEditorCursor(toEnd: vm.searchCaretResetsToEnd)
             }
             // A preserved screen re-summons as it was left, so a menu must end with the palette.
             .onChange(of: vm.isVisible) {
@@ -604,6 +604,12 @@ struct RootPaletteView: View {
             .onKeyPress(keys: [.tab], phases: .down) { press in
                 // ⇥ inside an open list belongs to the list, not to the form's field order.
                 if vm.isControlListOpen { return .handled }
+                if !menuOpen, vm.mode == .ai, !vm.isComposing,
+                    !press.modifiers.contains(.shift),
+                    core.quickAICoordinator.skillMenu(for: vm.query) != nil {
+                    activateSelection()
+                    return .handled
+                }
                 if !menuOpen { advanceTabFocus(backwards: press.modifiers.contains(.shift)) }
                 return .handled
             }

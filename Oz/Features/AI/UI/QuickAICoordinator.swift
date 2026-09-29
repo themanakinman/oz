@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 
 /// The palette's AI screen: summoning, the open policy, and handing a chat on to the window.
 @MainActor
@@ -22,6 +22,52 @@ final class QuickAICoordinator {
 
     private var chat: AIChatState { chats.quickAI }
     private var chatCoordinator: AIChatCoordinator { core.aiChatCoordinator }
+    var skills: AISkillStore { core.aiSkills }
+
+    func prepareSkills() {
+        guard settings.aiEnabled else { return }
+        skills.refresh()
+    }
+
+    func skillMenu(for input: String) -> PopoverMenuContent? {
+        guard !palette.isComposing, let command = AISkillCommand.parse(input) else { return nil }
+        switch command {
+        case .command:
+            return PopoverMenuContent(header: nil, items: [
+                PopoverMenuItem(title: "Skills", systemImage: "sparkles") { [weak self] in
+                    self?.completeSkillCommand("/skills ")
+                }
+            ])
+        case .browse(let query):
+            var items = (skills.catalog?.matching(query) ?? []).map { skill in
+                PopoverMenuItem(title: skill.name, icon: .symbol("sparkles"), detail: skill.summary) { [weak self] in
+                    self?.completeSkillCommand("/skills \(skill.id) ")
+                }
+            }
+            if skills.isLoading || skills.error != nil || items.isEmpty {
+                let title = skills.isLoading ? "Loading Skills…" : skills.error ?? "No Skills Found"
+                items = [PopoverMenuItem(
+                    title: title, systemImage: "doc.text", isLoading: skills.isLoading, isEnabled: false) {}]
+            }
+            items.append(PopoverMenuItem(
+                title: "Edit skills.md", systemImage: "pencil", isEnabled: !skills.isLoading,
+                startsSection: true
+            ) { [weak self] in
+                guard let self else { return }
+                if !NSWorkspace.shared.open(skills.file) {
+                    core.showMessage("Could not open skills.md")
+                }
+            })
+            return PopoverMenuContent(header: "Skills", items: items)
+        case .invocation:
+            return nil
+        }
+    }
+
+    private func completeSkillCommand(_ value: String) {
+        palette.query = value
+        palette.resetSearchCaretToEnd()
+    }
 
     func show() {
         guard settings.aiEnabled else { return }
@@ -44,6 +90,11 @@ final class QuickAICoordinator {
         }
         chat.startNewChat()
         paletteCoordinator.showPalette(mode: .ai)
+        if AISkillCommand.parse(prompt) != nil {
+            palette.query = prompt
+            prepareSkills()
+            return
+        }
         send(prompt)
     }
 

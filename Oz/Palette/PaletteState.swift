@@ -32,8 +32,9 @@ final class PaletteState {
     private(set) var isVisible = false
     /// Changes every time the palette is shown so the search field can re-focus.
     var focusToken = UUID()
-    /// Requests AppKit to put the shared search field editor back at its leading edge.
+    /// Requests AppKit to place the shared field editor's caret at the specified edge.
     private(set) var searchCaretResetToken = UUID()
+    private(set) var searchCaretResetsToEnd = false
     /// Bumped when a screen opens fresh, so lists snap to the top even when nothing else changed.
     var resetToken = UUID()
     /// Bumped when an action reorders the list, so the highlight scrolls back into view.
@@ -101,6 +102,12 @@ final class PaletteState {
     }
 
     func resetSearchCaretToBeginning() {
+        searchCaretResetsToEnd = false
+        searchCaretResetToken = UUID()
+    }
+
+    func resetSearchCaretToEnd() {
+        searchCaretResetsToEnd = true
         searchCaretResetToken = UUID()
     }
 

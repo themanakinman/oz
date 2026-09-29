@@ -517,6 +517,9 @@ run ai-pdf-test            Oz/Features/AI/Model/AIPDFText.swift \
                            Oz/Features/AI/Service/AIPDFTextExtractor.swift \
                            Oz/Features/AI/Service/AIPDFTextReader.swift \
                            Oz/Features/AI/Service/AIPDFTextProvider.swift
+run ai-skills-test         Oz/Features/AI/Model/AISkillCatalog.swift \
+                           Oz/Features/AI/Model/AISkillCommand.swift \
+                           Oz/Features/AI/Service/AISkillStore.swift
 run slow ai-command-test   Oz/Features/AI/Model/JSONValue.swift \
                            Oz/Features/AI/Model/AITool.swift \
                            Oz/Features/AI/Model/AIFileTools.swift \

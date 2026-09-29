@@ -40,13 +40,17 @@ final class PalettePanel: NSPanel {
     }
 
     func resetFieldEditorCursorToBeginning() {
+        resetFieldEditorCursor(toEnd: false)
+    }
+
+    func resetFieldEditorCursor(toEnd: Bool) {
         guard let editor = fieldEditor else { return }
         Task { @MainActor [weak self, weak editor] in
             await Task.yield()
             guard let self, let editor, self.fieldEditor === editor else { return }
-            let beginning = NSRange(location: 0, length: 0)
-            editor.setSelectedRange(beginning)
-            editor.scrollRangeToVisible(beginning)
+            let range = NSRange(location: toEnd ? (editor.string as NSString).length : 0, length: 0)
+            editor.setSelectedRange(range)
+            editor.scrollRangeToVisible(range)
         }
     }
 
