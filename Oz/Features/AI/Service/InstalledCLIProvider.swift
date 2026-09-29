@@ -28,7 +28,8 @@ private final class InstalledCLITurnRunner {
     /// The same boundary, for the one route that is handed tools: everything else stays off.
     private static let toolSafetyInstructions = """
         You are an assistant inside Oz. Use only the MCP tools supplied with this request. \
-        Perform filesystem operations through the built-in Files tools when offered. \
+        Use built-in Files for filesystem operations and run_command for shell commands, builds \
+        and tests when offered. \
         Native commands and file tools are unavailable.
         """
     private static let openCodeConfiguration = """

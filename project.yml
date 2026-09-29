@@ -81,6 +81,8 @@ targets:
     sources:
       - Oz/Features/AI/Service/AIFileHelper.swift
       - Oz/Features/AI/Service/AIFileToolRunner.swift
+      - Oz/Features/AI/Service/AICommandRunner.swift
+      - Oz/Features/AI/Model/AICommandPolicy.swift
       - Oz/Features/AI/Model/AIFileTools.swift
       - Oz/Features/AI/Model/AIFileAccessPolicy.swift
       - Oz/Features/AI/Model/AITool.swift

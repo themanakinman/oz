@@ -11,14 +11,15 @@ final class CodexTurnRunner {
     /// The same boundary for the one turn shape that is handed tools; everything else stays off.
     private static let toolSafetyInstructions = """
         You are an assistant inside Oz. Use only the MCP tools supplied with this request. \
-        Perform filesystem operations through the built-in Files tools when offered. \
+        Use built-in Files for filesystem operations and run_command for shell commands, builds \
+        and tests when offered. \
         Native commands and file tools are unavailable.
         """
     private static let webSearchInstructions = """
         You may search the web when the answer depends on current or external information. Cite a \
         source as a markdown link whose text is the publication's name, never "Read more" or a URL.
         """
-    private static let noWebSearchInstructions = "Never access external resources."
+    private static let noWebSearchInstructions = "Do not browse the web for this turn."
 
     var connect: (@MainActor ([AIToolServer]) async throws -> [ChatGPTSubscription.Model])?
     var onTurnEnded: (@MainActor () -> Void)?

@@ -10,7 +10,8 @@ nothing about MCP. `AIChatCoordinator.send` is the one place the two meet.
 
 Chat also offers built-in [Files](ai.md#autonomous-files), independent of this feature's switch and
 server list. Its reserved handle is `oz-files`; it uses the same CLI server transport but automatically
-grants known built-in calls. External MCP servers continue to use the trust policy below. The Files
+grants known built-in calls, including shell/build/test execution through `run_command`.
+External MCP servers continue to use the trust policy below. The Files
 runner's safeguards do not govern external servers.
 
 ## Invariants
@@ -97,7 +98,8 @@ runner's safeguards do not govern external servers.
 - **A CLI's own configuration is not edited.** Launch arguments, the child's environment
   and files inside Oz's own workspace are the whole surface; `~/.codex` and `~/.claude` are
   never written to configure a provider. Built-in Files has independent filesystem access and
-  protects `.codex` from modification. The secrets Oz keeps never reach argv, where `ps` would show them: Codex
+  protects `.codex` from structured file modification; project commands run outside that file policy.
+  The secrets Oz keeps never reach argv, where `ps` would show them: Codex
   reads them from the app-server's environment through the config keys that name a variable, and
   Claude reads them from a `0600` file written per turn into the private workspace and deleted when
   the turn ends — or, when Oz did not live to see it end, by `InstalledAIManager` at the next

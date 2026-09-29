@@ -33,10 +33,17 @@ struct AIFileToolRunner: Sendable {
             case "find_files", "search_files": result = try search(arguments, contents: name == "search_files")
             case "read_file": result = try read(arguments)
             case "file_versions": result = try versions(arguments)
+            case "run_command":
+                let directory = try path(arguments, key: "working_directory")
+                try requireDirectory(directory)
+                let timeout = integer(arguments, "timeout_seconds", default: 120, maximum: 900)
+                result = try AICommandRunner(home: home, environment: ProcessInfo.processInfo.environment)
+                    .run(try string(arguments, "command"), directory: directory, timeout: TimeInterval(timeout))
             default: result = try withMutationLock { try mutate(name, arguments) }
             }
             let data = try boundedResult(result)
-            return AIToolResult(callID: call.id, content: String(data: data, encoding: .utf8) ?? "{}", isError: false)
+            let failed = name == "run_command" && ((result["exit_code"] as? Int) != 0 || result["timed_out"] as? Bool == true)
+            return AIToolResult(callID: call.id, content: String(data: data, encoding: .utf8) ?? "{}", isError: failed)
         } catch {
             return .failure(call.id, error.localizedDescription)
         }
@@ -367,6 +374,8 @@ struct AIFileToolRunner: Sendable {
                 result["matches"] = Array(matches.dropLast())
             } else if let content = result["content"] as? String, !content.isEmpty {
                 result["content"] = String(content.prefix(content.count / 2))
+            } else if let output = result["output"] as? String, !output.isEmpty {
+                result["output"] = String(output.suffix(output.count / 2))
             } else { throw Failure("The filesystem result exceeds the output limit.") }
             data = try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys])
         }

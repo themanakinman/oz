@@ -118,6 +118,12 @@ MCP server. The helper receives home and channel-specific checkpoint paths, appl
 and has no UI or database. `AIChatCoordinator` composes the tools into the existing chat routes;
 there is no separate project or workspace owner.
 
+`AICommandPolicy` checks direct command forms; the stateless `AICommandRunner` launches commands in
+their own process groups and captures bounded output off the main thread. Project code runs with the
+user's filesystem access, outside the structured file policy. `AIFileHelper` reads requests while
+tools run so cancellation, EOF and termination signals can stop them. Both command routes share the
+same runner, environment filtering and timeout handling.
+
 ## Entry points and windows
 
 `OzApp` (`@main`) declares only two `MenuBarExtra` scenes — Oz's own item and the

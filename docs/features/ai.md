@@ -20,13 +20,14 @@ Grok, OpenCode and Cursor remain text routes. The selected model receives the co
 
 `AIFileTools` defines directory listing, name and text search, paged UTF-8 reads, file creation and
 replacement, exact text edits, directory creation, moves, Trash, version listing and restoration.
+It also offers `run_command` for shell commands, builds and tests in a directory the model discovers.
 `AIFileToolRunner` performs those operations off the main thread for API models. Codex and Claude
 receive the bundled stdio MCP executable `Contents/Helpers/AIFileHelper`, which uses the same runner.
 Built-in Files calls are answered automatically with no Allow/Deny dialog, independently of the MCP
 setting. External servers retain their existing trust policy. `oz-files` is reserved for the built-in
 server so an external server cannot inherit its automatic approval.
 
-The safeguards are enforced by the runner:
+The structured file operations enforce these safeguards:
 
 - Writes and exact edits require the revision returned by a read, or `missing` for new files.
   Stale reads and ambiguous replacements fail; existing move destinations are never overwritten.
@@ -45,12 +46,36 @@ The safeguards are enforced by the runner:
   completed effects remain, and an operation already in progress may finish. Stop interrupts the
   turn. Unknown or unoffered tool names cannot execute through Oz's API loop.
 
-This iteration supplies autonomous filesystem operations. Shell execution, builds, test commands,
-package installation and Git commands are not offered by Files. Native CLI execution and file tools
-remain disabled; trusted external MCP tools have their own capabilities and are not governed by the
-built-in runner's filesystem policy. Arbitrary shell execution needs an enforcement design before
-it can share the automatic approval path. Quick Actions receives no Files access, and title
-generation cannot execute Files calls.
+### Commands, builds and tests
+
+`run_command` shares the same automatic approval and Files toggle on both chat surfaces. It takes a
+command and an absolute or `~/` working directory; there is no project setup. `AICommandRunner` runs
+`/bin/zsh -f -c` with closed stdin, captured stdout/stderr and a separate process group. Commands
+receive the user's home, a small environment for development tools and `CI=1`, without inheriting
+provider credentials or shell startup configuration. Results include exit code, elapsed time,
+timeout status, total output bytes and the last 12 KB of output; nonzero exits are tool failures.
+The default timeout is 120 seconds, capped at 900. Stop and timeout terminate the process group,
+escalating to SIGKILL after 500 ms. The MCP helper keeps reading while tools run, handles cancellation,
+and cancels running tools on input EOF, SIGTERM or SIGINT. Signal callbacks are explicitly Sendable.
+
+`AICommandPolicy` rejects known destructive command forms, including `rm`, privileged system
+commands and Git operations that discard work or delete history. It checks common command wrappers
+and literal shell `-c` bodies, and rejects shell redirection, command substitution, dynamic command
+names, background execution and inline interpreter programs. Source edits belong in the structured
+Files tools, where revisions and backups apply.
+
+This is a command filter, not an OS sandbox. Project scripts, executables, dependencies and tool
+configuration are trusted code running with the user's filesystem permissions. They can modify or
+delete files, and their effects do not pass through the structured file tools' revision, backup or
+protected-path checks. The model is instructed to inspect project instructions and scripts before
+execution and never bypass safeguards; the filter cannot guarantee that arbitrary project code
+avoids irreversible effects. Commands may use the network for development tools independently of
+the web-search toggle.
+
+Native Codex and Claude execution/file tools remain disabled; commands use Oz's supplied tool on
+every supported route. External MCP tools retain their own capabilities and policies. Quick Actions
+receives no Files access, and title generation cannot execute Files calls. Command output stays in
+the current tool turn; saved history carries the ordinary activity and result status.
 
 ## Invariants
 
