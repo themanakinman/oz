@@ -7,6 +7,7 @@ nonisolated enum ChatAttachmentReader {
         let payload: ChatAttachment.Payload
         let name: String
         let preview: Data?
+        var detail: String?
     }
 
     /// A refusal rather than a nil, so one bad file in a paste is named instead of vanishing.
@@ -26,7 +27,9 @@ nonisolated enum ChatAttachmentReader {
     }
 
     /// Sized before it is read, so a four-gigabyte CSV can never be slurped into memory.
-    static func read(_ file: URL) -> Outcome {
+    static func read(
+        _ file: URL, nativeDocuments: Bool = true, maximumTextBytes: Int = AIPDFText.maximumTextBytes
+    ) async -> Outcome {
         let name = file.lastPathComponent
         guard let kind = AIAttachmentPolicy.kind(forFileName: name) else {
             return .failed(.unsupported(file.pathExtension.lowercased()))
@@ -35,7 +38,10 @@ nonisolated enum ChatAttachmentReader {
         let ceiling =
             kind == .text ? AIAttachmentBudget.maxInlinedTextBytes : AIAttachmentBudget.maxBytes
         guard size <= ceiling else { return .failed(kind == .text ? .textTooLong : .size) }
-        guard let bytes = try? Data(contentsOf: file) else { return .failed(.unreadable) }
+        guard let handle = try? FileHandle(forReadingFrom: file) else { return .failed(.unreadable) }
+        defer { try? handle.close() }
+        guard let bytes = try? handle.read(upToCount: ceiling + 1) else { return .failed(.unreadable) }
+        guard bytes.count <= ceiling else { return .failed(kind == .text ? .textTooLong : .size) }
         let mimeType = AIAttachmentPolicy.mimeType(forFileName: name)
         switch kind {
         case .image:
@@ -45,6 +51,15 @@ nonisolated enum ChatAttachmentReader {
                     payload: .image(AIImage(data: png, mimeType: "image/png")), name: name,
                     preview: preview(png)))
         case .pdf:
+            do {
+                let result = try await AIPDFTextReader.extract(
+                    bytes, maximumBytes: maximumTextBytes, validationOnly: nativeDocuments)
+                if !nativeDocuments {
+                    return .staged(Staged(
+                        payload: .document(AIDocument(data: Data(result.content.utf8), mimeType: "text/plain", name: name)),
+                        name: name, preview: nil, detail: result.label))
+                }
+            } catch { return .failed(.pdfExtraction(error.localizedDescription)) }
             return .staged(
                 Staged(
                     payload: .document(AIDocument(data: bytes, mimeType: mimeType, name: name)),

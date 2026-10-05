@@ -41,9 +41,14 @@ Xcode, prefix with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` (t
 project settings in `project.yml`, run `xcodegen generate` and commit the result. There is no
 `Package.swift`, and `Bundle.module` must never be used.
 
-The app target builds and embeds `ClipboardTextHelper` under `Contents/Helpers`, signing it on copy.
-Build the app scheme to include it; copying only the main executable omits OCR support. The helper's
-executable name stays fixed even when release builds override the app's product name for a channel.
+The app target builds and embeds `ClipboardTextHelper`, `AIFileHelper` and `AIPDFHelper` under `Contents/Helpers`,
+signing them on copy. Build the app scheme to include them; copying only the main executable omits
+OCR and the Codex/Claude Files tools. All helper executable names stay fixed when release builds override
+the app's product name for a channel. Files checkpoints live under the app's channel-specific
+Application Support directory, while files edited by a chat can be anywhere macOS permits. The
+helper also supplies shell/build/test execution to Codex and Claude; API turns use the same command
+runner inside the app. Project code runs with the user's filesystem access, so the Dev channel does
+not isolate its effects on project files.
 
 ### The dev channel
 
@@ -110,7 +115,8 @@ find in scope*. Measured on `fuzz-test.swift`: 60 errors with no entry, 0 with o
 It reads the source lists from `run-tests.sh` itself, so they cannot drift from what the suite actually
 compiles. `Scripts/sync-lsp.sh` runs it too. Three things it has to get right, all of which fail
 silently otherwise: every path is absolute, because `sourcekit-lsp` resolves the command itself and does
-not apply `directory` to relative arguments; the command carries an explicit `-sdk`; and each entry
+not apply `directory` to relative arguments; the command carries an explicit `-sdk` and macOS 26
+`-target`; and each entry
 claims **only files under `Tests/`** — its harness plus any helper compiled beside it. The command
 still lists every shipped source it compiles, so symbols resolve inside the harness, but claiming a
 shipped source too would hand it this three-file command instead of the app's, and `.compile` is

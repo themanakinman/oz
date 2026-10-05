@@ -262,12 +262,16 @@ final class AIChatCoordinator {
     @discardableResult
     func send(_ input: String, in chat: AIChatState) -> Bool {
         guard settings.aiEnabled else { return false }
+        guard !chat.isLoadingAttachments else {
+            core.showMessage("Your attachments are still loading. Send when they are ready.", tone: .neutral)
+            return false
+        }
         do {
             let address = MCPComposerAddress.parse(input, slugs: core.mcpCoordinator.slugs)
             let sent = chat.send(
                 address.rest, using: try provider(for: chat, scopedTo: address.slug),
                 model: model(for: chat), webSearch: webSearch(for: chat),
-                instructions: instructions, contextBudget: contextBudget(for: chat),
+                instructions: instructions(for: chat, scopedTo: address.slug), contextBudget: contextBudget(for: chat),
                 toolScope: address.slug)
             // Named while the answer streams, so the sidebar has a title before the reply ends.
             if sent { nameIfNeeded(chat) }
@@ -285,15 +289,11 @@ final class AIChatCoordinator {
             chat.report(ChatAttachmentRefusal.imagesUnsupported.message)
             return
         }
-        if !message.documents.isEmpty, !capabilities.documents {
-            chat.report(ChatAttachmentRefusal.documentsUnsupported.message)
-            return
-        }
         do {
             let sent = chat.send(
                 message.text, using: try provider(for: chat, scopedTo: message.toolScope),
                 model: model(for: chat), webSearch: webSearch(for: chat),
-                instructions: instructions, contextBudget: contextBudget(for: chat),
+                instructions: instructions(for: chat, scopedTo: message.toolScope), contextBudget: contextBudget(for: chat),
                 toolScope: message.toolScope, replaying: message)
             if sent { nameIfNeeded(chat) }
         } catch {
@@ -309,7 +309,7 @@ final class AIChatCoordinator {
             chat.regenerate(
                 using: try provider(for: chat, scopedTo: scope),
                 model: model(for: chat), webSearch: webSearch(for: chat),
-                instructions: instructions, contextBudget: contextBudget(for: chat))
+                instructions: instructions(for: chat, scopedTo: scope), contextBudget: contextBudget(for: chat))
         } catch {
             chat.report(error.localizedDescription)
         }
@@ -319,18 +319,36 @@ final class AIChatCoordinator {
         core.aiSettings.webSearchEnabled && capabilities(for: chat).webSearch
     }
 
-    private var instructions: String? {
-        AIInstructions.compose(
+    private func instructions(for chat: AIChatState, scopedTo slug: String?) -> String? {
+        let prompt = AIInstructions.compose(
             userPrompt: core.aiSettings.systemPrompt,
             isEnabled: core.aiSettings.systemPromptEnabled)
+        guard filesEnabled(in: chat, scopedTo: slug) else { return prompt }
+        return [prompt, AIFileTools.instructions(home: fileRunner.home.path)]
+            .compactMap { $0 }.joined(separator: "\n\n")
+    }
+
+    private var fileRunner: AIFileToolRunner {
+        AIFileToolRunner(
+            home: FileManager.default.homeDirectoryForCurrentUser,
+            revisions: AppPaths.applicationSupport().appendingPathComponent("AI/File Revisions", isDirectory: true))
+    }
+
+    private func filesEnabled(in chat: AIChatState, scopedTo slug: String?) -> Bool {
+        capabilities(for: chat).tools && slug == nil && chat.toolScope.allows(AIFileTools.handle)
     }
 
     /// A turn's route and its tools: a CLI with its own client is handed servers, others the loop.
     private func provider(for chat: AIChatState, scopedTo slug: String?) throws -> any AIProvider {
-        guard model(for: chat)?.runsItsOwnTools == true else {
-            return toolAware(try provider(for: chat), scopedTo: slug, in: chat)
+        let provider: any AIProvider
+        if model(for: chat)?.runsItsOwnTools == true {
+            provider = try self.provider(for: chat, toolServers: toolServers(for: chat, scopedTo: slug))
+        } else {
+            provider = toolAware(try self.provider(for: chat), scopedTo: slug, in: chat)
         }
-        return try provider(for: chat, toolServers: toolServers(for: chat, scopedTo: slug))
+        guard !capabilities(for: chat).documents else { return provider }
+        return AIPDFTextProvider(
+            base: provider, maximumBytes: min(AIPDFText.maximumTextBytes, contextBudget(for: chat) / AIAttachmentBudget.maxCount))
     }
 
     /// The same narrowing as `tools(for:scopedTo:)`, for a client that starts its own servers.
@@ -339,10 +357,24 @@ final class AIChatCoordinator {
         let excluded = chat.toolScope.excluded
         let chatID = chat.session.id
         let mcp = core.mcpCoordinator
+        let files: [AIToolServer]
+        if filesEnabled(in: chat, scopedTo: slug) {
+            let runner = fileRunner
+            let executable = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/AIFileHelper")
+            files = [AIToolServer(
+                handle: AIFileTools.handle, title: AIFileTools.origin,
+                transport: .command(path: executable.path,
+                                    arguments: [runner.home.path, runner.revisions.path], environment: [:]))]
+        } else { files = [] }
         return AIToolServerSession(rounds: core.aiSettings.toolRounds.limit) {
-            await mcp.toolServers(scopedTo: slug).filter { !excluded.contains($0.handle) }
+            files + (await mcp.toolServers(scopedTo: slug).filter {
+                $0.handle != AIFileTools.handle && !excluded.contains($0.handle)
+            })
         } consent: { call in
-            await mcp.permit(call, in: chatID)
+            if call.handle == AIFileTools.handle {
+                return !files.isEmpty && AIFileTools.owns(AIFileTools.prefix + call.tool)
+            }
+            return await mcp.permit(call, in: chatID)
         }
     }
 
@@ -353,10 +385,15 @@ final class AIChatCoordinator {
         let tools = tools(for: chat, scopedTo: slug)
         guard capabilities(for: chat).tools, !tools.isEmpty else { return provider }
         let chatID = chat.session.id
+        let runner = filesEnabled(in: chat, scopedTo: slug) ? fileRunner : nil
         return AIToolLoopProvider(
             base: provider, tools: tools, maxRounds: core.aiSettings.toolRounds.limit
         ) { [mcp = core.mcpCoordinator] call in
-            await mcp.invoke(call, in: chatID)
+            if AIFileTools.owns(call.name) {
+                guard let runner else { return .failure(call.id, "Filesystem tools are disabled for this turn.") }
+                return await runner.invoke(call)
+            }
+            return await mcp.invoke(call, in: chatID)
         }
     }
 
@@ -364,9 +401,10 @@ final class AIChatCoordinator {
     private func tools(for chat: AIChatState, scopedTo slug: String?) -> [AITool] {
         guard chat.toolScope.isEnabled else { return [] }
         let excluded = chat.toolScope.excluded
-        return core.mcpCoordinator.tools(scopedTo: slug).filter { tool in
+        let files = filesEnabled(in: chat, scopedTo: slug) ? AIFileTools.tools : []
+        return files + core.mcpCoordinator.tools(scopedTo: slug).filter { tool in
             guard let route = MCPToolName.parse(tool.name) else { return true }
-            return !excluded.contains(route.slug)
+            return route.slug != AIFileTools.handle && !excluded.contains(route.slug)
         }
     }
 
@@ -375,10 +413,12 @@ final class AIChatCoordinator {
 
     func setToolsEnabled(_ enabled: Bool, in chat: AIChatState) {
         chat.toolScope.isEnabled = enabled
+        if !enabled { chat.cancel() }
     }
 
     func toggleToolServer(_ slug: String, in chat: AIChatState) {
         chat.toolScope.toggle(slug)
+        if !chat.toolScope.allows(slug) { chat.cancel() }
     }
 
     func showMCPSettings() {
@@ -406,6 +446,7 @@ final class AIChatCoordinator {
         case .appleIntelligence?: return .appleIntelligence
         case .codex?: return .codex
         case .claude?: return .claudeCommand
+        case .antigravity?: return .antigravityCommand
         case .grok?, .openCode?, .cursor?:
             return AIModelCapabilities(
                 images: false, documents: false, webSearch: false, tools: false)
@@ -439,7 +480,7 @@ final class AIChatCoordinator {
             systemPrompt: core.aiSettings.systemPromptEnabled,
             webSearch: core.aiSettings.webSearchEnabled && can.webSearch,
             toolServers: can.tools && scope.isEnabled
-                ? mcpServers.count { scope.allows($0.slug) } : 0)
+                ? mcpServers.count { scope.allows($0.slug) } + (scope.allows(AIFileTools.handle) ? 1 : 0) : 0)
     }
 
     // MARK: - Attachments
@@ -506,7 +547,6 @@ final class AIChatCoordinator {
             }
             switch kind {
             case .image where !can.images: return .imagesUnsupported
-            case .pdf where !can.documents: return .documentsUnsupported
             default: continue
             }
         }
@@ -516,12 +556,28 @@ final class AIChatCoordinator {
     /// Files first, raw bytes as fallback; the chord is consumed, never pasting a path.
     private func stage(files: [URL], pasted: Data?, into chat: AIChatState) {
         let generation = chat.stagingGeneration
-        Task { [weak self, weak chat] in
-            let read = await Task.detached(priority: .userInitiated) {
+        let nativeDocuments = capabilities(for: chat).documents
+        let maximumTextBytes = min(AIPDFText.maximumTextBytes, contextBudget(for: chat) / AIAttachmentBudget.maxCount)
+        let id = UUID()
+        let task = Task { [weak self, weak chat] in
+            defer { chat?.finishAttachmentTask(id: id) }
+            let reader = Task.detached(priority: .userInitiated) {
                 () -> [ChatAttachmentReader.Outcome] in
-                if !files.isEmpty { return files.map(ChatAttachmentReader.read) }
+                if !files.isEmpty {
+                    var outcomes: [ChatAttachmentReader.Outcome] = []
+                    for file in files {
+                        guard !Task.isCancelled else { return outcomes }
+                        outcomes.append(await ChatAttachmentReader.read(
+                            file, nativeDocuments: nativeDocuments, maximumTextBytes: maximumTextBytes))
+                    }
+                    return outcomes
+                }
                 return pasted.map { [ChatAttachmentReader.image($0)] } ?? []
-            }.value
+            }
+            let read = await withTaskCancellationHandler {
+                await reader.value
+            } onCancel: { reader.cancel() }
+            guard !Task.isCancelled else { return }
             guard let self, let chat else { return }
             guard generation == chat.stagingGeneration else {
                 core.showMessage(
@@ -537,14 +593,19 @@ final class AIChatCoordinator {
                     return
                 case .staged(let item):
                     let attachment = ChatAttachment(
-                        payload: item.payload, name: item.name, preview: item.preview)
+                        payload: item.payload, name: item.name, preview: item.preview, detail: item.detail)
                     if let refusal = chat.attach(attachment) {
                         core.showMessage(refusal.message, tone: .neutral)
                         return
                     }
+                    if item.detail?.contains("Partial") == true {
+                        core.showMessage(
+                            "\(item.name): only part of this PDF fits. The attachment is marked Partial.", tone: .neutral)
+                    }
                 }
             }
         }
+        chat.trackAttachmentTask(task, id: id)
     }
 
     // MARK: - Models
@@ -557,7 +618,7 @@ final class AIChatCoordinator {
         core.aiSettings.enabledInstalledProviders.contains { kind in
             switch kind {
             case .codex: core.chatGPTSubscription.phase == .starting
-            case .claude, .grok, .openCode, .cursor:
+            case .claude, .grok, .openCode, .cursor, .antigravity:
                 core.installedAI.status(for: kind).phase == .checking
             }
         }
@@ -571,8 +632,8 @@ final class AIChatCoordinator {
 
     /// The chat's own model while it is still reachable; otherwise the default a new chat takes.
     func model(for chat: AIChatState) -> AIModelSelection? {
-        if let own = chat.session.model, isReachable(own) { return own }
-        return core.aiSettings.defaultModel
+        if let own = chat.session.model, isReachable(own) { return AIModelOption.canonical(own) }
+        return core.aiSettings.defaultModel.map(AIModelOption.canonical)
     }
 
     /// A route removed in Settings falls back to the default rather than failing the chat.
@@ -582,7 +643,7 @@ final class AIChatCoordinator {
             return true
         case .api(let connection, let model, _):
             return core.aiSettings.connection(id: connection)?.models.contains(model) == true
-        case .codex, .claude, .grok, .openCode, .cursor:
+        case .codex, .claude, .grok, .openCode, .cursor, .antigravity:
             return selection.source.installedKind.map {
                 core.aiSettings.enabledInstalledProviders.contains($0)
             } ?? false
@@ -633,6 +694,7 @@ final class AIChatCoordinator {
         case .claude?: return .asset(AIBrand.claude.assetName)
         case .grok?: return .asset(AIBrand.x.assetName)
         case .cursor?: return AIModelOption.cursorIcon
+        case .antigravity(let model, _)?: return AIModelOption.icon(AIBrand.resolve(model: model))
         case .openCode(let model, _)?: return AIModelOption.icon(AIBrand.resolve(model: model))
         case .api(let connection, let model, _)?:
             return AIModelOption.icon(

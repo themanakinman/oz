@@ -8,11 +8,18 @@ Claude routes the vendor CLI is, and Oz supplies the servers and answers for the
 `Features/MCP/` owns servers and knows nothing about chat; [AI](ai.md) owns tool calling and knows
 nothing about MCP. `AIChatCoordinator.send` is the one place the two meet.
 
+Chat also offers built-in [Files](ai.md#autonomous-files), independent of this feature's switch and
+server list. Its reserved handle is `oz-files`; it uses the same CLI server transport but automatically
+grants known built-in calls, including shell/build/test execution through `run_command`.
+External MCP servers continue to use the trust policy below. The Files
+runner's safeguards do not govern external servers.
+
 ## Invariants
 
 - **MCP is off out of the box, and off means fully off.** `AppSettings.mcpEnabled` is the flag and
   `MCPCoordinator.applyEnabled()` is the only place that projects it: no connection opened, no local
-  process resident, no tool named to any model. `aiEnabled` off does the same, because chat is the
+  process resident, no external tool named to any model. Built-in Files remains available when MCP
+  is off. `aiEnabled` off removes both, because chat is the
   only consumer. That reaches the Codex helper too, which keeps what it was launched with until it
   exits: when MCP goes off, or a server it runs is removed, set to Never Allow or signed out of,
   `ChatGPTSubscriptionManager.dropWithdrawnServers` stops it between turns rather than leave the
@@ -88,9 +95,11 @@ nothing about MCP. `AIChatCoordinator.send` is the one place the two meet.
   the route an `AIToolServerSession` instead of wrapping it. The same servers — less an OAuth one
   nobody is signed into, which a CLI could not explain — the same `MCPTrust` and the same
   `ChatToolUse` rows either way.
-- **A CLI is told what to run, never where to keep it.** Launch arguments, the child's environment
+- **A CLI's own configuration is not edited.** Launch arguments, the child's environment
   and files inside Oz's own workspace are the whole surface; `~/.codex` and `~/.claude` are
-  never written. The secrets Oz keeps never reach argv, where `ps` would show them: Codex
+  never written to configure a provider. Built-in Files has independent filesystem access and
+  protects `.codex` from structured file modification; project commands run outside that file policy.
+  The secrets Oz keeps never reach argv, where `ps` would show them: Codex
   reads them from the app-server's environment through the config keys that name a variable, and
   Claude reads them from a `0600` file written per turn into the private workspace and deleted when
   the turn ends — or, when Oz did not live to see it end, by `InstalledAIManager` at the next

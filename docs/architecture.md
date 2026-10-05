@@ -106,11 +106,23 @@ fine too; deciding something with one is what the rule forbids. `showNotice`, `c
 
 New long-lived state belongs on `AppCore`, wired in `start()`. Do not create a competing singleton: this is a singleton, not a container.
 
-Clipboard text recognition is the one feature that leaves the process. `AppCore` owns the indexer;
+Clipboard text recognition leaves the process. `AppCore` owns the indexer;
 the stateless `ClipboardTextWorker` runs one bundled `ClipboardTextHelper` per item, from
 `Contents/Helpers`, and reaps it before returning. Vision's and PDFKit's allocations therefore belong
 to a process that exits, and the helper — which has no database, clipboard or settings access — is
 handed an input path and answers with bounded text down a pipe.
+
+AI Files uses the stateless `AIFileToolRunner` for effects and `AIFileAccessPolicy` for decisions.
+API turns run it off the main thread; Codex and Claude start the bundled `AIFileHelper` as a stdio
+MCP server. The helper receives home and channel-specific checkpoint paths, applies the same policy,
+and has no UI or database. `AIChatCoordinator` composes the tools into the existing chat routes;
+there is no separate project or workspace owner.
+
+`AICommandPolicy` checks direct command forms; the stateless `AICommandRunner` launches commands in
+their own process groups and captures bounded output off the main thread. Project code runs with the
+user's filesystem access, outside the structured file policy. `AIFileHelper` reads requests while
+tools run so cancellation, EOF and termination signals can stop them. Both command routes share the
+same runner, environment filtering and timeout handling.
 
 ## Entry points and windows
 

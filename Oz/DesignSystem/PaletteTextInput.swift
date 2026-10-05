@@ -10,6 +10,7 @@ struct PaletteTextInput: View {
     var focusKey: UUID?
     var multiline = false
     var usesSearchFont = false
+    var selectsTextOnFocus = false
     var maximumHeight: CGFloat = .greatestFiniteMagnitude
     var onSubmit: () -> Void = {}
     @State private var caret = PaletteInputCaretState()
@@ -17,7 +18,8 @@ struct PaletteTextInput: View {
     var body: some View {
         PaletteInputRepresentable(
             text: $text, font: font, focusKey: focusKey, multiline: multiline,
-            label: label, maximumHeight: maximumHeight, caret: caret, onSubmit: onSubmit)
+            label: label, maximumHeight: maximumHeight, selectsTextOnFocus: selectsTextOnFocus,
+            caret: caret, onSubmit: onSubmit)
             .background(alignment: .topLeading) {
                 if text.isEmpty, !caret.isComposing {
                     Text(prompt)
@@ -68,6 +70,7 @@ private struct PaletteInputRepresentable: NSViewRepresentable {
     let multiline: Bool
     let label: String
     let maximumHeight: CGFloat
+    let selectsTextOnFocus: Bool
     let caret: PaletteInputCaretState
     let onSubmit: () -> Void
 
@@ -98,6 +101,7 @@ private struct PaletteInputRepresentable: NSViewRepresentable {
         view.isAutomaticQuoteSubstitutionEnabled = false
         view.isAutomaticDashSubstitutionEnabled = false
         view.string = text
+        view.selectsTextOnFocus = selectsTextOnFocus
         view.onCaretChanged = { [weak coordinator = context.coordinator] in coordinator?.reportCaret() }
         scroll.documentView = view
         return scroll
@@ -110,6 +114,7 @@ private struct PaletteInputRepresentable: NSViewRepresentable {
         if view.font != font { view.font = font }
         view.textColor = NSColor(Theme.Colors.textPrimary)
         view.setAccessibilityLabel(label)
+        view.selectsTextOnFocus = selectsTextOnFocus
         if view.string != text, !view.hasMarkedText() { view.string = text }
         if let focusKey, context.coordinator.focusedKey != focusKey {
             context.coordinator.focusedKey = focusKey
@@ -200,6 +205,7 @@ private struct PaletteInputRepresentable: NSViewRepresentable {
 
 private final class PaletteInputTextView: NSTextView {
     var onCaretChanged: (() -> Void)?
+    var selectsTextOnFocus = false
     private var windowTokens: [NotificationToken] = []
     private var scrollToken: NotificationToken?
     private var needsFocus = false
@@ -209,7 +215,10 @@ private final class PaletteInputTextView: NSTextView {
         Task { @MainActor [weak self] in
             await Task.yield()
             guard let self, needsFocus, let window else { return }
-            if window.makeFirstResponder(self) { needsFocus = false }
+            if window.makeFirstResponder(self) {
+                needsFocus = false
+                if selectsTextOnFocus, !hasMarkedText() { selectAll(nil) }
+            }
         }
     }
 
@@ -217,6 +226,16 @@ private final class PaletteInputTextView: NSTextView {
         let accepted = super.becomeFirstResponder()
         onCaretChanged?()
         return accepted
+    }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        selectsTextOnFocus || super.acceptsFirstMouse(for: event)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        let gainingFocus = window?.isKeyWindow != true || window?.firstResponder !== self
+        super.mouseDown(with: event)
+        if selectsTextOnFocus, gainingFocus, !hasMarkedText() { selectAll(nil) }
     }
 
     override func resignFirstResponder() -> Bool {

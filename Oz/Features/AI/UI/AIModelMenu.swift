@@ -48,7 +48,7 @@ enum AIModelMenu {
     static func attachments(coordinator: AIChatCoordinator, chat: AIChatState) -> PopoverMenuContent {
         var items = chat.pendingAttachments.map { attachment in
             PopoverMenuItem(
-                title: attachment.name, icon: attachment.menuIcon, detail: "✕"
+                title: attachment.name, icon: attachment.menuIcon, detail: attachment.detail ?? "✕"
             ) {
                 coordinator.removeAttachment(attachment.id, in: chat)
             }

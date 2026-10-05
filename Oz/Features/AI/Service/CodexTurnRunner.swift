@@ -10,15 +10,16 @@ final class CodexTurnRunner {
         """
     /// The same boundary for the one turn shape that is handed tools; everything else stays off.
     private static let toolSafetyInstructions = """
-        You are providing text generation inside Oz. The only tools you may use are the MCP \
-        tools supplied with this request. Never execute commands, read files, inspect the \
-        environment, or modify files.
+        You are an assistant inside Oz. Use only the MCP tools supplied with this request. \
+        Use built-in Files for filesystem operations and run_command for shell commands, builds \
+        and tests when offered. \
+        Native commands and file tools are unavailable.
         """
     private static let webSearchInstructions = """
         You may search the web when the answer depends on current or external information. Cite a \
         source as a markdown link whose text is the publication's name, never "Read more" or a URL.
         """
-    private static let noWebSearchInstructions = "Never access external resources."
+    private static let noWebSearchInstructions = "Do not browse the web for this turn."
 
     var connect: (@MainActor ([AIToolServer]) async throws -> [ChatGPTSubscription.Model])?
     var onTurnEnded: (@MainActor () -> Void)?
@@ -171,10 +172,16 @@ final class CodexTurnRunner {
         let handle = CodexMCPLaunch.handle(ofServer: name)
         if let handle, let tool = item["tool"]?.stringValue { turn.startedTools[handle] = tool }
         let origin = handle.map { AIToolServerRow.title(of: $0, in: turn.servers) }
+        let tool = item["tool"]?.stringValue ?? ""
+        let arguments = item["arguments"].flatMap { value in
+            value.stringValue ?? (try? JSONSerialization.data(withJSONObject: value.jsonObject, options: [.fragmentsAllowed]))
+                .flatMap { String(data: $0, encoding: .utf8) }
+        } ?? "{}"
+        let title = handle == AIFileTools.handle ? AIFileTools.activity(name: tool, arguments: arguments) : nil
         turn.continuation.yield(
             .toolCall(
                 id: id, origin: origin ?? AIToolServerRow.label(name),
-                title: AIToolServerRow.label(item["tool"]?.stringValue ?? "")))
+                title: title ?? AIToolServerRow.label(tool)))
         turn.spentCalls += 1
         guard let roundCap = turn.roundCap, turn.spentCalls > roundCap else { return }
         // Finished before the interrupt, whose own cleanup would otherwise name a different reason.

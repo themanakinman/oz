@@ -19,12 +19,17 @@ There is no CI: every item is on you, run locally. CodeRabbit reviews each PR, b
 not a gate. Each is expanded below; the manual sweep at the end of this file is the sixth, judged by
 what you touched.
 
+PDF attachment coverage is in `ai-pdf-test`: selectable text, scanned-page OCR, page boundaries,
+text/page limits, locked and malformed files, the bundled helper protocol and text-route conversion.
+
 ## The harnesses
 
 ```sh
 ./Scripts/run-tests.sh              # all of them
 ./Scripts/run-tests.sh calc-test    # just one, while iterating
 ```
+
+The runner sets `MACOSX_DEPLOYMENT_TARGET=26.0`; standalone compiles use the app's platform floor.
 
 The suite runs in parallel, `hw.ncpu` harnesses at a time, which is what takes it from about 140
 seconds to about 15. `OZ_TEST_JOBS=1` forces it back to one at a time. Each result is numbered
@@ -81,6 +86,7 @@ If a change touches anything in the right column, the harness on the left is man
 
 | Harness | Guards |
 | --- | --- |
+| `ai-command-test` | command policy, real compiler/build/test execution, exit status, bounded output, filtered environment, timeout and cancellation of process groups; the shipped MCP helper's concurrent input, cancellation, EOF and signal shutdown |
 | `fuzz-test` | `Launcher/Model/SearchRelevance.swift`, `EntryNaming.swift`, `ScriptRomanization.swift`, `LauncherOrder.swift` |
 | `corpus-test` | the launcher's ranking, over a dense synthetic index — **a new complaint is a new case in `Tests/launcher-corpus/corpus.json`** |
 | `file-search-test` | `FileSearch/Model/`, plus the shared `FuzzyMatch` scorer |

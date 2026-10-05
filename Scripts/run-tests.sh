@@ -6,6 +6,7 @@
 # member, which is how CI reported success over a harness that had not compiled since phase 10.
 
 set -uo pipefail
+export MACOSX_DEPLOYMENT_TARGET=26.0
 
 # Absolute: the workers re-enter this script after the cd, where a relative $0 would not resolve.
 SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
@@ -95,8 +96,8 @@ run() {
         local sources=()
         for source in "$@" "Tests/$name.swift"; do sources+=("$PWD/$source"); done
         [ "$ran" -gt 1 ] && printf ',' >> "$DB"
-        printf '{"directory":"%s","command":"swiftc -swift-version 6 -sdk %s' \
-            "$PWD" "$(xcrun --show-sdk-path --sdk macosx)" >> "$DB"
+        printf '{"directory":"%s","command":"swiftc -swift-version 6 -target %s-apple-macos26.0 -sdk %s' \
+            "$PWD" "$(uname -m)" "$(xcrun --show-sdk-path --sdk macosx)" >> "$DB"
         printf ' %s' "${sources[@]}" >> "$DB"
         # Claim every file under `Tests/`: the harness and any helper compiled beside it. A shipped
         # source stays unclaimed, because it would get this short command instead of the app's full
@@ -507,7 +508,24 @@ run support-test           Oz/Features/Support/Model/*.swift
 run ai-provider-test       Oz/Features/Settings/AppSettingsKey.swift \
                            Oz/Features/AI/Model/*.swift \
                            Oz/Features/AI/Settings/AISettingsStore.swift
+run ai-pdf-test            Oz/Features/AI/Model/AIPDFText.swift \
+                           Oz/Features/AI/Model/AIRequest.swift \
+                           Oz/Features/AI/Model/AITool.swift \
+                           Oz/Features/AI/Model/JSONValue.swift \
+                           Oz/Features/AI/Model/AIAttachmentPolicy.swift \
+                           Oz/Features/AI/Service/AIProvider.swift \
+                           Oz/Features/AI/Service/AIPDFTextExtractor.swift \
+                           Oz/Features/AI/Service/AIPDFTextReader.swift \
+                           Oz/Features/AI/Service/AIPDFTextProvider.swift
+run slow ai-command-test   Oz/Features/AI/Model/JSONValue.swift \
+                           Oz/Features/AI/Model/AITool.swift \
+                           Oz/Features/AI/Model/AIFileTools.swift \
+                           Oz/Features/AI/Model/AIFileAccessPolicy.swift \
+                           Oz/Features/AI/Model/AICommandPolicy.swift \
+                           Oz/Features/AI/Service/AIFileToolRunner.swift \
+                           Oz/Features/AI/Service/AICommandRunner.swift
 run ai-chat-test           Oz/Features/AI/Model/AIRequest.swift \
+                           Oz/Features/AI/Model/AIFileTools.swift \
                            Oz/Features/AI/Model/AIConnection.swift \
                            Oz/Features/AI/Model/AppleIntelligence.swift \
                            Oz/Features/AI/Model/AIAttachmentPolicy.swift \
@@ -598,6 +616,7 @@ run slow codex-turn-test   Oz/Platform/AppPaths.swift \
                            Oz/Platform/ExecutableLocator.swift \
                            Oz/Features/AI/Service/CodexTurnRunner.swift
 run installed-ai-test     Oz/Features/AI/Model/*.swift \
+                          Oz/Features/AI/Service/AIToolLoopProvider.swift \
                           Oz/Features/AI/Service/AIProvider.swift \
                           Oz/Platform/AppPaths.swift \
                           Oz/Platform/ExecutableLocator.swift \

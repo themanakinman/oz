@@ -4,7 +4,7 @@ import SwiftUI
 struct AIEmptyState: View {
 
     @Environment(\.metrics) private var metrics
-    private static let prompt = "Empty slate. Ask a question."
+    private static let prompt = "What would you like to do?"
     let message: String?
     let canConfigure: Bool
     let onConfigure: () -> Void

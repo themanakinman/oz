@@ -41,6 +41,9 @@ final class AISettingsStore {
     var toolRounds: AIToolRounds {
         didSet { defaults.set(toolRounds.rawValue, forKey: AppSettingsKey.aiToolRounds.rawValue) }
     }
+    var antigravityPlan: AntigravitySubscriptionTier {
+        didSet { defaults.set(antigravityPlan.rawValue, forKey: AppSettingsKey.aiAntigravityPlan.rawValue) }
+    }
     var enabledInstalledProviders: Set<InstalledAIKind> {
         didSet {
             guard
@@ -85,6 +88,10 @@ final class AISettingsStore {
         toolRounds =
             AIToolRounds(rawValue: defaults.integer(forKey: AppSettingsKey.aiToolRounds.rawValue))
             ?? .twentyFive
+        antigravityPlan =
+            AntigravitySubscriptionTier(
+                rawValue: defaults.string(forKey: AppSettingsKey.aiAntigravityPlan.rawValue) ?? "")
+            ?? .unspecified
         enabledInstalledProviders = Self.decodeEnabledInstalledProviders(
             defaults.data(forKey: AppSettingsKey.aiInstalledProviders.rawValue))
         if case .api(let connection, let model, _) = defaultModel,
@@ -161,10 +168,23 @@ final class AISettingsStore {
     func reconcile(
         installed kind: InstalledAIKind, models: [InstalledAIModel], isUnavailable: Bool
     ) {
+        if kind == .antigravity, case .antigravity(let model, let effort) = defaultModel {
+            if isUnavailable {
+                defaultModel = firstAvailableSelection()
+            } else if let match = models.first(where: { $0.id == AntigravityLaunch.modelFamily(model) }) {
+                defaultModel = .antigravity(
+                    model: match.id,
+                    effort: match.resolvedEffort(effort ?? AntigravityLaunch.modelEffort(model)))
+            } else if let first = models.first {
+                defaultModel = .antigravity(model: first.id, effort: first.resolvedEffort(nil))
+            }
+            return
+        }
         let selectedModel: String
         switch (kind, defaultModel) {
         case (.claude, .claude(let model, _)), (.grok, .grok(let model, _)),
-            (.openCode, .openCode(let model, _)), (.cursor, .cursor(let model, _)):
+            (.openCode, .openCode(let model, _)), (.cursor, .cursor(let model, _)),
+            (.antigravity, .antigravity(let model, _)):
             selectedModel = model
         default:
             return
@@ -193,6 +213,9 @@ final class AISettingsStore {
         case .cursor:
             defaultModel = .cursor(
                 model: replacement.id, effort: replacement.resolvedEffort(nil))
+        case .antigravity:
+            defaultModel = .antigravity(
+                model: replacement.id, effort: replacement.resolvedEffort(nil))
         case .codex: break
         }
     }
@@ -218,7 +241,7 @@ final class AISettingsStore {
         let matches =
             switch (kind, source) {
             case (.codex, .codex), (.claude, .claude), (.grok, .grok), (.openCode, .openCode),
-                (.cursor, .cursor):
+                (.cursor, .cursor), (.antigravity, .antigravity):
                 true
             default: false
             }

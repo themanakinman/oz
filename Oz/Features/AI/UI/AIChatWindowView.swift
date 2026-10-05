@@ -27,6 +27,11 @@ struct AIChatWindowView: View {
         .clipShape(Rectangle())
         .environment(\.metrics, metrics)
         .onChange(of: state.palette.menuQuery) { state.menuSelection = 0 }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
+            guard notification.object as? NSWindow === window,
+                state.menu == nil, !state.showsFind, state.renaming == nil else { return }
+            state.composerFocus = UUID()
+        }
         .onChange(of: coordinator.chats.window.session.id) {
             state.closeMenu()
             state.find.query = ""
