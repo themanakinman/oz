@@ -19,6 +19,9 @@ There is no CI: every item is on you, run locally. CodeRabbit reviews each PR, b
 not a gate. Each is expanded below; the manual sweep at the end of this file is the sixth, judged by
 what you touched.
 
+PDF attachment coverage is in `ai-pdf-test`: selectable text, scanned-page OCR, page boundaries,
+text/page limits, locked and malformed files, the bundled helper protocol and text-route conversion.
+
 ## The harnesses
 
 ```sh

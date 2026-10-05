@@ -52,7 +52,8 @@ enum AIAttachmentPolicy {
             let contents = String(data: document.data, encoding: .utf8)
         else { return nil }
         let fence = String(repeating: "`", count: max(3, longestBacktickRun(in: contents) + 1))
-        let hint = (document.name as NSString).pathExtension.lowercased()
+        let extensionHint = (document.name as NSString).pathExtension.lowercased()
+        let hint = extensionHint == "pdf" ? "text" : extensionHint
         return """
             Attached file: \(sanitized(name: document.name))
             \(fence)\(hint)

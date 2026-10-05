@@ -39,10 +39,19 @@ targets:
           - Features/Clipboard/Service/ClipboardTextExtractor.swift
           - Features/Clipboard/Service/ClipboardTextHelper.swift
           - Features/AI/Service/AIFileHelper.swift
+          - Features/AI/Service/AIPDFHelper.swift
+          - Features/AI/Service/AIPDFTextExtractor.swift
       # The MIT mark's licence asks the notice to travel with the binary, not just the repo.
       - path: NOTICE.md
         buildPhase: resources
     dependencies:
+      - target: AIPDFHelper
+        link: false
+        embed: true
+        codeSign: true
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
       - target: AIFileHelper
         link: false
         embed: true
@@ -74,6 +83,19 @@ targets:
         Debug:
           PRODUCT_NAME: Oz Dev
           PRODUCT_BUNDLE_IDENTIFIER: com.oz.app.dev
+
+  AIPDFHelper:
+    type: tool
+    platform: macOS
+    sources:
+      - Oz/Features/AI/Service/AIPDFHelper.swift
+      - Oz/Features/AI/Service/AIPDFTextExtractor.swift
+      - Oz/Features/AI/Model/AIPDFText.swift
+    settings:
+      base:
+        EXECUTABLE_NAME: AIPDFHelper
+        PRODUCT_MODULE_NAME: AIPDFHelper
+        SKIP_INSTALL: YES
 
   AIFileHelper:
     type: tool

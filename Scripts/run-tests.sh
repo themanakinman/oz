@@ -508,6 +508,15 @@ run support-test           Oz/Features/Support/Model/*.swift
 run ai-provider-test       Oz/Features/Settings/AppSettingsKey.swift \
                            Oz/Features/AI/Model/*.swift \
                            Oz/Features/AI/Settings/AISettingsStore.swift
+run ai-pdf-test            Oz/Features/AI/Model/AIPDFText.swift \
+                           Oz/Features/AI/Model/AIRequest.swift \
+                           Oz/Features/AI/Model/AITool.swift \
+                           Oz/Features/AI/Model/JSONValue.swift \
+                           Oz/Features/AI/Model/AIAttachmentPolicy.swift \
+                           Oz/Features/AI/Service/AIProvider.swift \
+                           Oz/Features/AI/Service/AIPDFTextExtractor.swift \
+                           Oz/Features/AI/Service/AIPDFTextReader.swift \
+                           Oz/Features/AI/Service/AIPDFTextProvider.swift
 run slow ai-command-test   Oz/Features/AI/Model/JSONValue.swift \
                            Oz/Features/AI/Model/AITool.swift \
                            Oz/Features/AI/Model/AIFileTools.swift \

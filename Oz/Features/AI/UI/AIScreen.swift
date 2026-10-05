@@ -219,7 +219,9 @@ private struct AttachmentsPill: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .tooltip(attachments.map(\.name).joined(separator: "\n"), edge: .bottom)
+        .tooltip(attachments.map {
+            [$0.name, $0.detail].compactMap { $0 }.joined(separator: " · ")
+        }.joined(separator: "\n"), edge: .bottom)
         .accessibilityLabel(
             attachments.count == 1
                 ? "Attached \(attachments[0].name)" : "\(attachments.count) files attached")

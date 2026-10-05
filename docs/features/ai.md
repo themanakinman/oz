@@ -581,7 +581,7 @@ window, and every chat action either surface sends — is the nineteenth feature
 - In the window, send, then press ⌘N before the reply ends: the old chat keeps its sidebar spinner,
   finishes, and reopens complete. Rename one, send another turn in it, and the name holds.
 - Return sends, ⇧↩ breaks the line, and a Japanese IME's Return confirms its text without sending.
-- Drop a PDF on the pane with a text-only model selected: the HUD refuses it, as a paste would.
+- Drop a PDF on the pane with a text-only route selected: a page-labeled text attachment appears, with OCR and Partial labels when applicable. Repeat through paste and the paperclip.
 - Collapse the sidebar with its header button or ⌘Y; ⌘N and ⌘Q (Close Window) still work, and ⌘Q with
   Settings in front closes Settings instead.
 - Harnesses: `ai-provider-test` (endpoints, request bodies, stream decoding, persistence repair,
@@ -663,17 +663,17 @@ A text-ish file is deliberately absent from this table: it is inlined as text be
 sees the turn, so every route — the on-device model and all installed CLI transports included — takes one with no
 transport code at all.
 
-| Route | Web search | Images | PDFs | MCP tools |
+| Route | Web search | Images | PDF delivery | MCP tools |
 | --- | --- | --- | --- | --- |
-| Apple Intelligence | never — it reaches nothing | never — the model is text-only | never | never |
-| Codex | thread-scoped `web_search` config | `image` input part | never — the app-server takes no document part | Oz's servers, added as launch overrides; the reader's own are disabled by name |
-| Claude command | never | base64 `image` block in its stream-json user message | never | Oz's servers, through `--strict-mcp-config` and a private config file — an empty one when there are none, and neither flag under a managed MCP policy |
-| Grok command | never | never | never | the global config still loads — `--deny *` refuses the call |
-| OpenCode command | never | never | never | the global config still loads — `permission: deny` refuses the call |
-| Cursor command | never | never | never | the global config still loads — ask mode and withheld approval refuse the call |
-| OpenRouter | `plugins: [{id: "web"}]` — OpenRouter's own layer, any model | `image_url` part, only for models whose catalog lists the `image` modality | never yet — its catalog publishes a `file` modality Oz does not read | `tools` + `role: "tool"` turns |
+| Apple Intelligence | never — it reaches nothing | never — the model is text-only | extracted text | never |
+| Codex | thread-scoped `web_search` config | `image` input part | extracted text — the app-server takes no document part | Oz's servers, added as launch overrides; the reader's own are disabled by name |
+| Claude command | never | base64 `image` block in its stream-json user message | extracted text | Oz's servers, through `--strict-mcp-config` and a private config file — an empty one when there are none, and neither flag under a managed MCP policy |
+| Grok command | never | never | extracted text | the global config still loads — `--deny *` refuses the call |
+| OpenCode command | never | never | extracted text | the global config still loads — `permission: deny` refuses the call |
+| Cursor command | never | never | extracted text | the global config still loads — ask mode and withheld approval refuse the call |
+| OpenRouter | `plugins: [{id: "web"}]` — OpenRouter's own layer, any model | `image_url` part, only for models whose catalog lists the `image` modality | extracted text — native file delivery is not implemented | `tools` + `role: "tool"` turns |
 | OpenAI | not offered | `image_url` part, assumed supported | `file` part with `filename` and a `file_data` data URL | `tools` + `role: "tool"` turns |
-| Gemini / compatible | not offered | `image_url` part, assumed supported | never — a gateway that has not implemented the part bills the upload before rejecting it | `tools` + `role: "tool"` turns |
+| Gemini / compatible | not offered | `image_url` part, assumed supported | extracted text | `tools` + `role: "tool"` turns |
 | Anthropic | not offered | base64 `image` block | base64 `document` block, ahead of the text block | `tools` + `tool_use` / `tool_result` blocks |
 
 A search is part of the reply, not a status: `item/started` for a `webSearch` item appends a
@@ -695,8 +695,7 @@ Web search is a Settings → AI toggle, `aiWebSearch`, off by default: a prompt 
 only once the user has opted in.
 It's still excluded from backups — which Mac may send prompts to a search engine is that Mac's call.
 Nothing *guesses* at a capability: images ride on what the model's own catalog said, and a vendor
-API that does not take one simply returns its error. What is gated is only what a route provably
-cannot carry — a PDF to a text transport — refused at the composer with a HUD naming the reason.
+API that does not take one simply returns its error. Images a route cannot carry are refused at the composer. PDFs use native document delivery where available and local text extraction everywhere else.
 `AIModelCapabilities.documents` is true only for the two HTTP shapes whose bodies Oz writes;
 a gateway that has not implemented the `file` part would bill the upload before rejecting it, which
 is why documents are *not* assumed the way images are. An attachment is never dropped on the way
@@ -704,8 +703,22 @@ out: answering a question about a document the model never received is the one o
 not produce.
 
 In Quick AI attachments arrive by ⌘V; the window also takes a drop and the paperclip. They come in
-three kinds: an **image**, a **PDF** sent as a native document block,
+three kinds: an **image**, a **PDF** delivered natively or extracted locally as text,
 and a **text-ish file** whose contents are inlined as fenced, named text.
+
+`AIPDFHelper` runs PDFKit and Vision outside the app process. Text extraction preserves the original
+filename and page boundaries; image-only pages use OCR. The composer labels these attachments
+Extracted text, OCR and Partial where applicable. Locked, unreadable and textless documents report
+an actionable failure. PDFs are capped at 10 MB; extraction reads at most 64 pages and takes at most
+60 seconds. Extracted text is capped at the smaller of 32 KB and one sixth of the route's text budget,
+with an explicit partial-content notice included in the model input. It does not preserve visual
+layout. Clearing attachments or leaving the conversation cancels pending extraction; Send waits for staging to finish so a loading PDF cannot be omitted.
+`AIPDFTextProvider` also converts native PDFs supplied by a replay or model switch before a text-only
+route sees them, without changing that route's instructions, tools or images.
+
+The window composer accepts the first click and selects its draft when focused or when the window
+becomes key. Subsequent clicks position the caret normally. Find, rename and open tool/model menus
+retain their focus on window activation; marked text is never automatically selected.
 `PaletteWindowController`'s command-shortcut hook gives chat the chord first; a pasteboard holding
 file URLs or a bare image (a screenshot) stages them, while anything else carrying text falls
 through to the field editor as a normal paste. **Only `isFileURL` URLs are read** — without that
@@ -732,9 +745,8 @@ is a bug you cannot reproduce.
 Images are re-encoded to PNG and bounded to 1568px on the long edge, off-main on a detached task so
 a display-sized screenshot does not decode on the keystroke; one past `AIAttachmentBudget` is refused
 with a HUD instead of being staged. Because that decode outlives the keystroke, it shares the staged
-images' lifetime exactly: whatever consumes or clears them — a send, a new chat, Remove Attachments,
-or leaving the conversation for another in the window — disowns one still in flight and says so,
-rather than letting it surface on a later message. The counter that decides this sits on
+images' lifetime exactly: clearing staged attachments or disposing of the conversation cancels reads still in flight;
+sending waits for reads to finish instead of silently omitting a loading attachment. The counter that decides this sits on
 `AIChatState` beside the staged images, so a route that drops them cannot forget to move it.
 **Staged attachments share one pill beside the typed text**: the newest one's kind as a glyph — a
 photo, a PDF, a text file — and `+N` for the rest, because the strip's width is taken out of the

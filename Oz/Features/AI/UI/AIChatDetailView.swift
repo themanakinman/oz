@@ -141,6 +141,9 @@ struct AIChatDetailView: View {
 
     private var footer: some View {
         HStack(spacing: metrics.spacing.sm) {
+            if chat.isLoadingAttachments {
+                ProgressView().controlSize(.small).help("Reading attachments…")
+            }
             iconButton("paperclip", help: "Attach Files") { coordinator.chooseFiles(for: chat) }
             iconButton("wrench.and.screwdriver", help: "Choose this chat's tools") {
                 state.toggleMenu(.tools)

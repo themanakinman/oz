@@ -25,6 +25,7 @@ final class AIChatState {
     private(set) var notice: String?
     /// Files staged for the next message; they go out with whatever is typed next.
     private(set) var pendingAttachments: [ChatAttachment] = []
+    private(set) var isLoadingAttachments = false
     /// The window's unsent text; Quick AI's lives in the palette query instead.
     var draft = ""
     /// This chat's tools menu; a new chat starts with every connected server on.
@@ -35,6 +36,7 @@ final class AIChatState {
 
     private let history: ChatHistoryStore
     @ObservationIgnored private var replyTask: Task<Void, Never>?
+    @ObservationIgnored private var attachmentTasks: [UUID: Task<Void, Never>] = [:]
     @ObservationIgnored private var replyGeneration = 0
     /// Deltas buffered between flushes, so the transcript re-renders per cadence, not per token.
     @ObservationIgnored private var pendingText = ""
@@ -52,6 +54,20 @@ final class AIChatState {
 
     init(history: ChatHistoryStore) {
         self.history = history
+    }
+
+    isolated deinit {
+        for task in attachmentTasks.values { task.cancel() }
+    }
+
+    func trackAttachmentTask(_ task: Task<Void, Never>, id: UUID) {
+        attachmentTasks[id] = task
+        isLoadingAttachments = true
+    }
+
+    func finishAttachmentTask(id: UUID) {
+        attachmentTasks[id] = nil
+        isLoadingAttachments = !attachmentTasks.isEmpty
     }
 
     @discardableResult
@@ -169,6 +185,9 @@ final class AIChatState {
     }
 
     private func clearStaging() {
+        for task in attachmentTasks.values { task.cancel() }
+        attachmentTasks = [:]
+        isLoadingAttachments = false
         pendingAttachments = []
         stagingGeneration += 1
     }
@@ -412,7 +431,7 @@ enum ChatAttachmentRefusal: Equatable, Sendable {
     case unreadable
     case unsupported(String)
     case imagesUnsupported
-    case documentsUnsupported
+    case pdfExtraction(String)
 
     var message: String {
         switch self {
@@ -427,8 +446,7 @@ enum ChatAttachmentRefusal: Equatable, Sendable {
         case .unsupported(let ext):
             return "Oz can attach images, PDFs and text files, not .\(ext) files."
         case .imagesUnsupported: return "This model can't read images. Switch model to attach one."
-        case .documentsUnsupported:
-            return "This model can't read PDFs. Switch model, or paste the text instead."
+        case .pdfExtraction(let message): return message
         }
     }
 }
@@ -453,6 +471,7 @@ struct ChatAttachment: Identifiable, Equatable, Sendable {
     let name: String
     /// A ~40px PNG, about a kilobyte: six cost less to decode than one keystroke's re-render.
     let preview: Data?
+    var detail: String?
 
     var image: AIImage? {
         guard case .image(let image) = payload else { return nil }

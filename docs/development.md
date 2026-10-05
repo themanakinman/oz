@@ -41,9 +41,9 @@ Xcode, prefix with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` (t
 project settings in `project.yml`, run `xcodegen generate` and commit the result. There is no
 `Package.swift`, and `Bundle.module` must never be used.
 
-The app target builds and embeds `ClipboardTextHelper` and `AIFileHelper` under `Contents/Helpers`,
+The app target builds and embeds `ClipboardTextHelper`, `AIFileHelper` and `AIPDFHelper` under `Contents/Helpers`,
 signing them on copy. Build the app scheme to include them; copying only the main executable omits
-OCR and the Codex/Claude Files tools. Both executable names stay fixed when release builds override
+OCR and the Codex/Claude Files tools. All helper executable names stay fixed when release builds override
 the app's product name for a channel. Files checkpoints live under the app's channel-specific
 Application Support directory, while files edited by a chat can be anywhere macOS permits. The
 helper also supplies shell/build/test execution to Codex and Claude; API turns use the same command

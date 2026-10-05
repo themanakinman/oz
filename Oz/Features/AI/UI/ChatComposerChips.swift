@@ -51,6 +51,12 @@ struct AttachmentChip: View {
                 .font(metrics.typography.chip)
                 .lineLimit(1)
                 .foregroundStyle(Theme.Colors.textSecondary)
+            if let detail = attachment.detail {
+                Text(detail)
+                    .font(metrics.typography.chip)
+                    .foregroundStyle(Theme.Colors.textTertiary)
+                    .lineLimit(1)
+            }
             Button(action: onRemove) {
                 Image(systemName: "xmark")
                     .font(.system(size: metrics.scaled(9), weight: .semibold))
@@ -74,6 +80,7 @@ struct AttachmentChip: View {
         .onHover { hovered = $0 }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Attached \(attachment.name)")
+        .help([attachment.name, attachment.detail].compactMap { $0 }.joined(separator: " · "))
     }
 
     @ViewBuilder private var leading: some View {

@@ -262,6 +262,10 @@ final class AIChatCoordinator {
     @discardableResult
     func send(_ input: String, in chat: AIChatState) -> Bool {
         guard settings.aiEnabled else { return false }
+        guard !chat.isLoadingAttachments else {
+            core.showMessage("Your attachments are still loading. Send when they are ready.", tone: .neutral)
+            return false
+        }
         do {
             let address = MCPComposerAddress.parse(input, slugs: core.mcpCoordinator.slugs)
             let sent = chat.send(
@@ -283,10 +287,6 @@ final class AIChatCoordinator {
         let capabilities = capabilities(for: chat)
         if !message.images.isEmpty, !capabilities.images {
             chat.report(ChatAttachmentRefusal.imagesUnsupported.message)
-            return
-        }
-        if !message.documents.isEmpty, !capabilities.documents {
-            chat.report(ChatAttachmentRefusal.documentsUnsupported.message)
             return
         }
         do {
@@ -340,10 +340,15 @@ final class AIChatCoordinator {
 
     /// A turn's route and its tools: a CLI with its own client is handed servers, others the loop.
     private func provider(for chat: AIChatState, scopedTo slug: String?) throws -> any AIProvider {
-        guard model(for: chat)?.runsItsOwnTools == true else {
-            return toolAware(try provider(for: chat), scopedTo: slug, in: chat)
+        let provider: any AIProvider
+        if model(for: chat)?.runsItsOwnTools == true {
+            provider = try self.provider(for: chat, toolServers: toolServers(for: chat, scopedTo: slug))
+        } else {
+            provider = toolAware(try self.provider(for: chat), scopedTo: slug, in: chat)
         }
-        return try provider(for: chat, toolServers: toolServers(for: chat, scopedTo: slug))
+        guard !capabilities(for: chat).documents else { return provider }
+        return AIPDFTextProvider(
+            base: provider, maximumBytes: min(AIPDFText.maximumTextBytes, contextBudget(for: chat) / AIAttachmentBudget.maxCount))
     }
 
     /// The same narrowing as `tools(for:scopedTo:)`, for a client that starts its own servers.
@@ -541,7 +546,6 @@ final class AIChatCoordinator {
             }
             switch kind {
             case .image where !can.images: return .imagesUnsupported
-            case .pdf where !can.documents: return .documentsUnsupported
             default: continue
             }
         }
@@ -551,12 +555,28 @@ final class AIChatCoordinator {
     /// Files first, raw bytes as fallback; the chord is consumed, never pasting a path.
     private func stage(files: [URL], pasted: Data?, into chat: AIChatState) {
         let generation = chat.stagingGeneration
-        Task { [weak self, weak chat] in
-            let read = await Task.detached(priority: .userInitiated) {
+        let nativeDocuments = capabilities(for: chat).documents
+        let maximumTextBytes = min(AIPDFText.maximumTextBytes, contextBudget(for: chat) / AIAttachmentBudget.maxCount)
+        let id = UUID()
+        let task = Task { [weak self, weak chat] in
+            defer { chat?.finishAttachmentTask(id: id) }
+            let reader = Task.detached(priority: .userInitiated) {
                 () -> [ChatAttachmentReader.Outcome] in
-                if !files.isEmpty { return files.map(ChatAttachmentReader.read) }
+                if !files.isEmpty {
+                    var outcomes: [ChatAttachmentReader.Outcome] = []
+                    for file in files {
+                        guard !Task.isCancelled else { return outcomes }
+                        outcomes.append(await ChatAttachmentReader.read(
+                            file, nativeDocuments: nativeDocuments, maximumTextBytes: maximumTextBytes))
+                    }
+                    return outcomes
+                }
                 return pasted.map { [ChatAttachmentReader.image($0)] } ?? []
-            }.value
+            }
+            let read = await withTaskCancellationHandler {
+                await reader.value
+            } onCancel: { reader.cancel() }
+            guard !Task.isCancelled else { return }
             guard let self, let chat else { return }
             guard generation == chat.stagingGeneration else {
                 core.showMessage(
@@ -572,14 +592,19 @@ final class AIChatCoordinator {
                     return
                 case .staged(let item):
                     let attachment = ChatAttachment(
-                        payload: item.payload, name: item.name, preview: item.preview)
+                        payload: item.payload, name: item.name, preview: item.preview, detail: item.detail)
                     if let refusal = chat.attach(attachment) {
                         core.showMessage(refusal.message, tone: .neutral)
                         return
                     }
+                    if item.detail?.contains("Partial") == true {
+                        core.showMessage(
+                            "\(item.name): only part of this PDF fits. The attachment is marked Partial.", tone: .neutral)
+                    }
                 }
             }
         }
+        chat.trackAttachmentTask(task, id: id)
     }
 
     // MARK: - Models
