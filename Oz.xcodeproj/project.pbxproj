@@ -173,6 +173,7 @@
 		394EEFDE7DC1EB08371AF392 /* SupportReminderSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0A38066F61200588D72C446 /* SupportReminderSchedule.swift */; };
 		39892F4F2E94C791A465651F /* ASCIIKeyboardLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76DAF913A023B1B775F0042C /* ASCIIKeyboardLayout.swift */; };
 		398A6AD7B70C7BDE5C93935D /* CalculatorHistoryScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B154E0DD175BF754982BB3DC /* CalculatorHistoryScreen.swift */; };
+		3A3EDE9534F230CDC01F02C6 /* AntigravityToolProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1B3CF76EBC13BD9714670E2 /* AntigravityToolProtocol.swift */; };
 		3AAE7657AE248A436DCE1FDB /* EmojiGridGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3847C86004F7B8EDF4180AE6 /* EmojiGridGeometry.swift */; };
 		3AE2AA55B38FC3854DFDDFAE /* ActionMenuSearchQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA593DBA07E3109A8AB0DDBE /* ActionMenuSearchQuery.swift */; };
 		3B280FBC2E363072052F3CF9 /* MarkdownBlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7212E877911EA1D02B12ACC2 /* MarkdownBlock.swift */; };
@@ -1443,6 +1444,7 @@
 		F0C866942590D8738EC8CF74 /* CalcDateTime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalcDateTime.swift; sourceTree = "<group>"; };
 		F0FCB5B41A545A42E91DB5F5 /* ClipboardTextIndexer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardTextIndexer.swift; sourceTree = "<group>"; };
 		F162841CC66EA531128475A2 /* SettingsNavigationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsNavigationState.swift; sourceTree = "<group>"; };
+		F1B3CF76EBC13BD9714670E2 /* AntigravityToolProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntigravityToolProtocol.swift; sourceTree = "<group>"; };
 		F1CCD7929FF8D8CD01D51F82 /* ExtensionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionDetailView.swift; sourceTree = "<group>"; };
 		F2D90137AAD3B05E159AEF0D /* CalcPercent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalcPercent.swift; sourceTree = "<group>"; };
 		F2DDA6C8051DC06C253B68A3 /* UninstallScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UninstallScanner.swift; sourceTree = "<group>"; };
@@ -2855,6 +2857,7 @@
 				6A5D7F4B46F5CE18B9D1BFF5 /* AITool.swift */,
 				58C83674E19A09AA8095AB5D /* AIToolRounds.swift */,
 				85EB3A3ACC60DE3C89A3F8A9 /* AIToolServer.swift */,
+				F1B3CF76EBC13BD9714670E2 /* AntigravityToolProtocol.swift */,
 				8C257CCB36E0F4AC2C6B97A2 /* AppleIntelligence.swift */,
 				220AD9609429B405ECDAE426 /* ChatChoices.swift */,
 				9C7CD9563CC013BE79B20363 /* ChatCitations.swift */,
@@ -3533,6 +3536,7 @@
 				3AE2AA55B38FC3854DFDDFAE /* ActionMenuSearchQuery.swift in Sources */,
 				FDB987FEF87B6C68EFF0B9F0 /* ActivationPolicy.swift in Sources */,
 				AA5F53971E0CDD703EF98352 /* AliasStore.swift in Sources */,
+				3A3EDE9534F230CDC01F02C6 /* AntigravityToolProtocol.swift in Sources */,
 				E780642706674DBFC6898AF1 /* AppActionsMenu.swift in Sources */,
 				0ED14FE8445DEA331557034E /* AppAppearance.swift in Sources */,
 				2ADEDEF1D94426CCF1F431BB /* AppCore.swift in Sources */,

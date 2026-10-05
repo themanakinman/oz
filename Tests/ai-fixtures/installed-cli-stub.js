@@ -146,7 +146,7 @@ if (command === "opencode" && args.slice(0, 2).join(" ") === "session delete") {
 }
 
 if (command === "agy" && args[0] === "models") {
-  console.log("gemini-test-high\tGemini Test (High)\nclaude-test-low\tClaude Test (Low)");
+  console.log("gemini-test-high\tGemini Test (High)\ngemini-test-low\tGemini Test (Low)\nclaude-test-low\tClaude Test (Low)");
   process.exit(0);
 }
 
@@ -209,6 +209,29 @@ if (command === "agy") {
   if (model === "failed") {
     emit({ event: "result", result: { status: "ERROR", error: "authentication required" } });
     process.exit(1);
+  }
+  if (fs.readFileSync(agent, "utf8").includes("search_web")) {
+    for (const state of ["ACTIVE", "DONE"]) {
+      emit({ event: "step_update", step_update: {
+        step_type: "tool", state, tool_name: "search_web", tool_info: { parameters: { query: "Oz search" } }
+      }});
+    }
+  }
+  if (args.includes("--json-schema")) {
+    const conversation = JSON.parse(request.message.content.split("Conversation:\n")[1]);
+    const result = conversation.find(message => message.tool_result);
+    const output = result && model !== "repeat"
+      ? { text: "Tool returned: " + result.tool_result.content, calls: [] }
+      : { text: "", calls: [{ name: model === "unoffered" ? "native_shell" : "safe_echo",
+          arguments: model === "malformed" ? "[]" : JSON.stringify({ message: "one" }) }] };
+    emit({ event: "step_update", step_update: {
+      step_type: "agent_response", state: "DONE", text_delta: JSON.stringify(output)
+    }});
+    emit({ event: "result", result: {
+      status: "SUCCESS", response: JSON.stringify(output), structured_output: output,
+      usage: { input_tokens: 20, output_tokens: 4 }
+    }});
+    return;
   }
   if (model !== "final-only") {
     emit({ event: "step_update", step_update: {

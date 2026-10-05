@@ -134,7 +134,7 @@ struct AIModelOption: Identifiable {
         _ selection: AIModelSelection, settings: AISettingsStore,
         subscription: ChatGPTSubscriptionManager, installedAI: InstalledAIManager
     ) -> AIModelSelection {
-        let model = selection.model
+        let model = canonical(selection).model
         let effort: String?
         switch selection.source {
         case .appleIntelligence:
@@ -148,7 +148,7 @@ struct AIModelOption: Identifiable {
             effort = settings.connection(id: connection)?
                 .reasoningOptions(for: model)?.resolvedEffort(nil)
         }
-        return selection.withEffort(effort)
+        return canonical(selection).withEffort(effort)
     }
 
     @MainActor
@@ -157,7 +157,7 @@ struct AIModelOption: Identifiable {
         subscription: ChatGPTSubscriptionManager, installedAI: InstalledAIManager
     ) -> [ChatGPTSubscription.Effort] {
         guard let selection else { return [] }
-        let model = selection.model
+        let model = canonical(selection).model
         switch selection.source {
         case .appleIntelligence:
             return []
@@ -171,9 +171,16 @@ struct AIModelOption: Identifiable {
         }
     }
 
+    static func canonical(_ selection: AIModelSelection) -> AIModelSelection {
+        guard case .antigravity(let model, let effort) = selection else { return selection }
+        return .antigravity(
+            model: AntigravityLaunch.modelFamily(model),
+            effort: effort ?? AntigravityLaunch.modelEffort(model))
+    }
+
     var id: AIModelSelection { selection }
     func matches(_ other: AIModelSelection) -> Bool {
-        selection.source == other.source && selection.model == other.model
+        selection.source == other.source && selection.model == Self.canonical(other).model
     }
 }
 

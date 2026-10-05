@@ -41,6 +41,9 @@ final class AISettingsStore {
     var toolRounds: AIToolRounds {
         didSet { defaults.set(toolRounds.rawValue, forKey: AppSettingsKey.aiToolRounds.rawValue) }
     }
+    var antigravityPlan: AntigravitySubscriptionTier {
+        didSet { defaults.set(antigravityPlan.rawValue, forKey: AppSettingsKey.aiAntigravityPlan.rawValue) }
+    }
     var enabledInstalledProviders: Set<InstalledAIKind> {
         didSet {
             guard
@@ -85,6 +88,10 @@ final class AISettingsStore {
         toolRounds =
             AIToolRounds(rawValue: defaults.integer(forKey: AppSettingsKey.aiToolRounds.rawValue))
             ?? .twentyFive
+        antigravityPlan =
+            AntigravitySubscriptionTier(
+                rawValue: defaults.string(forKey: AppSettingsKey.aiAntigravityPlan.rawValue) ?? "")
+            ?? .unspecified
         enabledInstalledProviders = Self.decodeEnabledInstalledProviders(
             defaults.data(forKey: AppSettingsKey.aiInstalledProviders.rawValue))
         if case .api(let connection, let model, _) = defaultModel,
@@ -161,6 +168,18 @@ final class AISettingsStore {
     func reconcile(
         installed kind: InstalledAIKind, models: [InstalledAIModel], isUnavailable: Bool
     ) {
+        if kind == .antigravity, case .antigravity(let model, let effort) = defaultModel {
+            if isUnavailable {
+                defaultModel = firstAvailableSelection()
+            } else if let match = models.first(where: { $0.id == AntigravityLaunch.modelFamily(model) }) {
+                defaultModel = .antigravity(
+                    model: match.id,
+                    effort: match.resolvedEffort(effort ?? AntigravityLaunch.modelEffort(model)))
+            } else if let first = models.first {
+                defaultModel = .antigravity(model: first.id, effort: first.resolvedEffort(nil))
+            }
+            return
+        }
         let selectedModel: String
         switch (kind, defaultModel) {
         case (.claude, .claude(let model, _)), (.grok, .grok(let model, _)),

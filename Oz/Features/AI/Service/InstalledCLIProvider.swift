@@ -1,20 +1,32 @@
 import Foundation
 
 struct InstalledCLIProvider: AIProvider {
-    private let runner: InstalledCLITurnRunner
+    private let makeRunner: @MainActor @Sendable () -> InstalledCLITurnRunner
 
     @MainActor
     init(
         kind: InstalledAIKind, executable: URL?, model: String, effort: String?, workspace: URL,
         toolServers: AIToolServerSession? = nil
     ) {
-        runner = InstalledCLITurnRunner(
-            kind: kind, executable: executable, model: model, effort: effort,
-            workspace: workspace, toolServers: toolServers)
+        makeRunner = {
+            InstalledCLITurnRunner(
+                kind: kind, executable: executable, model: model, effort: effort,
+                workspace: workspace, toolServers: toolServers)
+        }
     }
 
     func stream(_ request: AIRequest) -> AIProviderStream {
-        runner.stream(request)
+        AIProviderStream { continuation in
+            let task = Task { @MainActor in
+                let runner = makeRunner()
+                defer { withExtendedLifetime(runner) {} }
+                do {
+                    for try await event in runner.stream(request) { continuation.yield(event) }
+                    continuation.finish()
+                } catch { continuation.finish(throwing: error) }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
     }
 }
 
@@ -63,6 +75,9 @@ private final class InstalledCLITurnRunner {
     private var turnSessionID: String?
     private var antigravityWorkspace: URL?
     private var hasStreamedText = false
+    private var antigravityTools: [AITool] = []
+    private var antigravityWebSearch = false
+    private var antigravitySchema: String?
     private var promptFileURL: URL?
     private var activeExecutable: URL?
     /// What this turn armed, empty on every route and every turn that offers no server.
@@ -148,7 +163,23 @@ private final class InstalledCLITurnRunner {
         }
 
         activeServers = await resolvedToolServers()
-        let prompt = prompt(for: request)
+        let prompt: String
+        do {
+            if kind == .antigravity {
+                antigravityTools = request.tools
+                antigravityWebSearch = request.webSearch
+                antigravitySchema =
+                    request.tools.isEmpty
+                    ? nil
+                    : try AntigravityToolProtocol.schema(tools: request.tools)
+                prompt = try AntigravityToolProtocol.prompt(request)
+            } else {
+                prompt = self.prompt(for: request)
+            }
+        } catch {
+            continuation.finish(throwing: AIProviderError.unavailable("Oz could not frame the AI request."))
+            return
+        }
         var configURL: URL?
         if !activeServers.isEmpty {
             let url = workspace.appending(path: ClaudeMCPLaunch.configurationFileName())
@@ -168,7 +199,8 @@ private final class InstalledCLITurnRunner {
 
         if kind == .antigravity {
             do {
-                antigravityWorkspace = try await Self.prepareAntigravityWorkspace(in: workspace)
+                antigravityWorkspace = try await Self.prepareAntigravityWorkspace(
+                    in: workspace, webSearch: request.webSearch)
             } catch {
                 continuation.finish(
                     throwing: AIProviderError.unavailable(
@@ -274,7 +306,9 @@ private final class InstalledCLITurnRunner {
         write(line, closing: activeServers.isEmpty)
     }
 
-    nonisolated private static func prepareAntigravityWorkspace(in root: URL) async throws -> URL {
+    nonisolated private static func prepareAntigravityWorkspace(
+        in root: URL, webSearch: Bool
+    ) async throws -> URL {
         try await Task.detached {
             let directory = root.appending(path: "oz-chat-\(UUID().uuidString)")
             let agents = directory.appending(path: ".agents/agents")
@@ -283,7 +317,8 @@ private final class InstalledCLITurnRunner {
                     at: agents, withIntermediateDirectories: true,
                     attributes: [.posixPermissions: 0o700])
                 try await Self.writePrivateFile(
-                    AntigravityLaunch.agentDefinition(name: directory.lastPathComponent),
+                    AntigravityLaunch.agentDefinition(
+                        name: directory.lastPathComponent, webSearch: webSearch),
                     to: agents.appending(path: directory.lastPathComponent + ".md"))
                 return directory
             } catch {
@@ -400,13 +435,18 @@ private final class InstalledCLITurnRunner {
             if let effort { result += ["--effort", effort] }
             return result
         case .antigravity:
-            return [
+            var result = [
                 "--agent", antigravityWorkspace?.lastPathComponent ?? "",
-                "--model", model,
+                "--model", AntigravityLaunch.modelFamily(model),
                 "--input-format", "stream-json",
                 "--output-format", "stream-json",
                 "--disable-slash-commands"
             ]
+            if let effort = effort ?? AntigravityLaunch.modelEffort(model) {
+                result += ["--effort", effort]
+            }
+            if let antigravitySchema { result += ["--json-schema", antigravitySchema] }
+            return result
         case .cursor:
             return [
                 "-p",
@@ -486,7 +526,8 @@ private final class InstalledCLITurnRunner {
             guard !line.isEmpty else { continue }
             apply(
                 InstalledAIStreamDecoder.decode(
-                    Data(line), kind: kind, servers: activeServers), token: token)
+                    Data(line), kind: kind, servers: activeServers,
+                    tools: antigravityTools, webSearch: antigravityWebSearch), token: token)
         }
         if outputBuffer.count > Self.maximumPartialLineBytes {
             fail(kind.title + " returned an oversized response.")
@@ -668,6 +709,9 @@ private final class InstalledCLITurnRunner {
     private func cleanup() {
         removeAntigravityWorkspace()
         hasStreamedText = false
+        antigravityTools = []
+        antigravityWebSearch = false
+        antigravitySchema = nil
         cancelConsents()
         process?.terminationHandler = nil
         (process?.standardOutput as? Pipe)?.fileHandleForReading.readabilityHandler = nil

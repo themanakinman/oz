@@ -57,7 +57,7 @@ struct AIModelSelectionRows<ModelLabel: View, EffortLabel: View>: View {
 
     private var modelBinding: Binding<AIModelSelection?> {
         Binding(
-            get: { selection?.withEffort(nil) },
+            get: { selection.map(AIModelOption.canonical)?.withEffort(nil) },
             set: { value in
                 select(
                     value.map {
@@ -70,10 +70,10 @@ struct AIModelSelectionRows<ModelLabel: View, EffortLabel: View>: View {
 
     private var effortBinding: Binding<String> {
         Binding(
-            get: { selection?.effort ?? "" },
+            get: { selection.map(AIModelOption.canonical)?.effort ?? "" },
             set: { effort in
                 guard let selection else { return }
-                select(selection.withEffort(effort))
+                select(AIModelOption.canonical(selection).withEffort(effort))
             })
     }
 }

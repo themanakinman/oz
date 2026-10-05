@@ -251,18 +251,29 @@ the current tool turn; saved history carries the ordinary activity and result st
   empty, so the fold would show one opening line.
 - **Antigravity reuses the installed `agy` login and its current model catalog.** Enable it under
   Settings → AI → Providers, run `agy` in Terminal to sign in if needed, then Check Again. `agy models`
-  discovers the account's slugs and names without generating a response; each slug already names its
-  reasoning level. The same picker route is available in Quick AI, AI Chat and Quick Actions, and
-  saved conversations retain it. Discovery never runs while its provider toggle is off.
+  discovers the account's slugs and names without generating a response. Oz groups effort variants
+  into model families and offers the reported levels in the same effort picker as Codex. Launch uses
+  the family ID and a separate `--effort`; combining a variant slug with a different effort fails.
+  Quick AI, AI Chat and Quick Actions share this route; saved conversations retain their chosen effort.
+  Discovery never runs while its provider toggle is off. The subscription picker records the reader's
+  declared Free, Google AI Pro or Google AI Ultra plan and shows it in the Providers row. It defaults
+  to Not specified: the headless CLI does not expose automatic plan discovery. This account label is
+  local to this Mac and excluded from settings backups.
   Each request uses a separate private workspace with an Oz custom primary agent. Its explicit tool
-  list contains only `finish`; native file, shell, browser, subagent and MCP tools are withheld.
-  No permission bypass is passed. Oz sends one JSON `user` message through stdin, streams
-  `agent_response.text_delta`, and completes only on a terminal `SUCCESS`. The final response is
-  used only if no delta arrived; usage comes from the terminal result. Images and web/MCP/Files
-  tools are unavailable; PDF attachments use Oz's local text/OCR extraction as on other text routes.
-  Oz deletes the temporary agent workspace after exit, but Antigravity retains its own conversation
-  data under its normal configuration; the Providers row states that caveat. Oz never changes the
-  user's Antigravity settings or reads its credentials. Auto-update is disabled for its subprocesses.
+  list contains `finish` plus `search_web` and `read_url_content` only when web search is enabled.
+  Native file, shell, browser, subagent and MCP tools remain withheld; no permission bypass is passed.
+  Files and scoped MCP tools use Oz's `AIToolLoopProvider`, including its consent, revisions, round
+  limits, result budgets and cancellation. `AntigravityToolProtocol` supplies offered tool schemas
+  and conversation history with call IDs and results. `--json-schema` constrains the final response
+  to text and calls; Oz validates the tool name and argument object before emitting any call. Raw
+  structured JSON deltas are withheld from the transcript; the final structured text is shown instead.
+  Without offered tools, Oz streams `agent_response.text_delta` and uses the final text only if no
+  delta arrived. A terminal `SUCCESS` completes a round and supplies usage. Native web tool steps
+  produce search activity rows. Images remain unavailable; PDF attachments use local text/OCR extraction.
+  Every CLI round gets its own runner and workspace so cleanup cannot cancel the next tool round.
+  Oz deletes its temporary workspace after exit, but Antigravity retains its own conversation data
+  under its normal configuration; the Providers row states that caveat. Oz never changes the user's
+  Antigravity settings or reads its credentials. Auto-update is disabled for its subprocesses.
   The CLI's [headless protocol](https://antigravity.google/docs/cli/headless/) and
   [custom agent schema](https://antigravity.google/docs/subagents/) define this transport.
 - **A conversation is live in one place at a time.** `AIChatSurfacesState` holds Quick AI's
@@ -352,6 +363,7 @@ as `.codex`, so an existing selection survives the rename.
 | Grok | installed `grok --prompt-file` | user's Grok login |
 | OpenCode | installed `opencode run` | providers already configured in OpenCode |
 | Cursor | installed `agent -p --mode ask` | user's Cursor login |
+| Antigravity | installed `agy` headless CLI | user's Google account |
 | OpenAI API | OpenAI Chat Completions | `https://api.openai.com/v1` |
 | Anthropic Claude | Anthropic Messages | `https://api.anthropic.com` |
 | Google Gemini | Gemini's OpenAI-compatible API | `https://generativelanguage.googleapis.com/v1beta/openai` |
@@ -652,7 +664,7 @@ reasoning effort belongs to `turn/start`; neither is written to the user's Codex
 developer instructions say whether the model may reach the web so the two cannot disagree. Images go
 out as `image` input parts with data URLs, and as `input_image` when prior turns are injected.
 
-`InstalledCLITurnRunner` handles Claude, Grok, OpenCode and Cursor behind the same provider protocol. It
+`InstalledCLITurnRunner` handles Claude, Grok, OpenCode, Cursor and Antigravity behind the same provider protocol. It
 frames Oz's instructions and bounded conversation history as stdin (or a private `--prompt-file` for
 Grok, whose CLI requires a path), consumes newline-delimited JSON, and never puts prompt text on the
 process command line. Claude uses stream JSON, `--effort` and no session persistence, and takes every
@@ -668,7 +680,7 @@ model variant through `--variant`; it captures the returned session identifier, 
 the local chat under `~/.cursor/chats/<workspace>/<session_id>` because the CLI has no delete-chat.
 A turn finishes on its own completion frame; both cleanups run detached after the child exits, so
 housekeeping never holds the composer shut.
-Cancellation terminates the child process; only one installed-CLI turn can own a runner at a time.
+Cancellation terminates the child process; each installed-CLI round gets a separate runner.
 
 ## Web search and attachments
 
@@ -687,6 +699,7 @@ transport code at all.
 | Grok command | never | never | extracted text | the global config still loads — `--deny *` refuses the call |
 | OpenCode command | never | never | extracted text | the global config still loads — `permission: deny` refuses the call |
 | Cursor command | never | never | extracted text | the global config still loads — ask mode and withheld approval refuse the call |
+| Antigravity command | per-turn search/URL tool allowlist | never | extracted text | Oz tool loop with structured calls and results; native MCP withheld |
 | OpenRouter | `plugins: [{id: "web"}]` — OpenRouter's own layer, any model | `image_url` part, only for models whose catalog lists the `image` modality | extracted text — native file delivery is not implemented | `tools` + `role: "tool"` turns |
 | OpenAI | not offered | `image_url` part, assumed supported | `file` part with `filename` and a `file_data` data URL | `tools` + `role: "tool"` turns |
 | Gemini / compatible | not offered | `image_url` part, assumed supported | extracted text | `tools` + `role: "tool"` turns |

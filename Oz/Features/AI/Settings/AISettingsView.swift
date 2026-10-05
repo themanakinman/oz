@@ -124,7 +124,7 @@ struct AISettingsView: View {
         return Section {
             Toggle(isOn: $settings.webSearchEnabled) {
                 SettingsRowTitle(.aiChat, "Web search")
-                Text("Codex and OpenRouter only. Prompts go to a search engine.")
+                Text("Codex, Antigravity and OpenRouter. Prompts go to a search engine.")
             }
             Picker(selection: $settings.toolRounds) {
                 ForEach(AIToolRounds.allCases) { Text($0.title).tag($0) }
@@ -132,7 +132,7 @@ struct AISettingsView: View {
                 SettingsRowTitle(.aiChat, "Tool call rounds")
                 Text(
                     "A reply stops after this many; Unlimited runs until Stop. "
-                        + "API connections, Codex and Claude.")
+                        + "API connections, Codex, Claude and Antigravity.")
             }
         } header: {
             SettingsSectionHeader(.aiChat)
@@ -254,6 +254,9 @@ struct AISettingsView: View {
             installedConnection(.openCode)
             installedConnection(.cursor)
             installedConnection(.antigravity)
+            if settings.enabledInstalledProviders.contains(.antigravity) {
+                antigravitySubscriptionRow
+            }
         } header: {
             SettingsSectionHeader(.aiInstalledAI)
         } footer: {
@@ -408,6 +411,16 @@ struct AISettingsView: View {
         } else {
             disabledProvider(kind)
         }
+    }
+
+    private var antigravitySubscriptionRow: some View {
+        @Bindable var settings = settings
+        return Picker("Antigravity subscription", selection: $settings.antigravityPlan) {
+            ForEach(AntigravitySubscriptionTier.allCases, id: \.self) { tier in
+                Text(tier.title).tag(tier)
+            }
+        }
+        .help("Set the plan linked to your Google account. This label does not change your subscription.")
     }
 
     private func disabledProvider(_ kind: InstalledAIKind) -> some View {
@@ -573,6 +586,9 @@ struct AISettingsView: View {
 
     private func readyDetail(_ kind: InstalledAIKind, _ status: InstalledAIStatus) -> String {
         var parts: [String] = []
+        if kind == .antigravity, settings.antigravityPlan != .unspecified {
+            parts.append(settings.antigravityPlan.title)
+        }
         if let version = status.version { parts.append("Version " + version) }
         parts.append(modelCount(status.models))
         if let caveat = kind.isolationCaveat(

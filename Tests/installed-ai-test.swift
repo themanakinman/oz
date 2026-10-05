@@ -39,7 +39,11 @@ struct InstalledAITests {
         cursorCatalogParsesListModels()
         grokCatalogParsesListedModels()
         antigravityCatalogAndSelectionRoundTrip()
+        antigravityRejectsInvalidStructuredBatches()
         await antigravityStreamsWithRestrictedAgent(fixture)
+        await antigravityWebSearchIsOptIn(fixture)
+        await antigravityRunsOzsToolLoop(fixture)
+        await antigravityToolFailuresAndRoundCap(fixture)
         await antigravityFinalOnlyAndFailedResponses(fixture)
         await antigravityCancellationRemovesItsWorkspace(fixture)
         statusJSONRecognizesLogin()
@@ -110,19 +114,24 @@ struct InstalledAITests {
         let output =
             "Fetching available models...\ngemini-test-high\tGemini Test (High)\n"
             + "claude-test-low\tClaude Test (Low)\ngemini-test-high\tDuplicate\n"
+            + "gemini-test-low\tGemini Test (Low)\ngemini-test-medium\tGemini Test (Medium)\n"
+            + "plain-model\tPlain Model\n"
         let models = InstalledAIModel.antigravityCatalog(output)
         expect(
-            models.map(\.id) == ["gemini-test-high", "claude-test-low"],
-            "Antigravity keeps catalog slugs and ignores diagnostics and duplicates")
-        expect(models.first?.name == "Gemini Test (High)", "Antigravity keeps display names")
-        expect(models.allSatisfy(\.efforts.isEmpty), "Antigravity effort is already in each slug")
+            models.map(\.id) == ["gemini-test", "claude-test", "plain-model"],
+            "Antigravity groups variants in first-seen order and ignores diagnostics and duplicates")
+        expect(models.first?.name == "Gemini Test", "Antigravity removes the effort from model titles")
+        expect(
+            models.first?.efforts.map(\.id) == ["low", "medium", "high"],
+            "Antigravity offers only the catalogued efforts in ascending order")
+        expect(models.last?.efforts.isEmpty == true, "a model without variants has no effort picker")
         let selection = AIModelSelection.antigravity(model: "gemini-test-high", effort: nil)
         let encoded = try? JSONEncoder().encode(selection)
         let decoded = encoded.flatMap { try? JSONDecoder().decode(AIModelSelection.self, from: $0) }
         expect(
             decoded == selection && selection.source == .antigravity,
             "Antigravity selections survive saved conversation round trips")
-        expect(!selection.runsItsOwnTools, "Antigravity never receives Oz's MCP servers")
+        expect(!selection.runsItsOwnTools, "Antigravity uses Oz's tool loop for scoped tools")
         for status in ["ERROR", "CANCELED", "INTERRUPTED", "INVALID", "WAITING", "RUNNING"] {
             let data = Data("{\"event\":\"result\",\"result\":{\"status\":\"\(status)\"}}".utf8)
             let frame = InstalledAIStreamDecoder.decode(data, kind: .antigravity)
@@ -150,6 +159,10 @@ struct InstalledAITests {
                 && arguments.contains("--input-format") && arguments.contains("--disable-slash-commands")
                 && !arguments.contains("--dangerously-skip-permissions"),
             "Antigravity runs the restricted agent with framed stdin and no approval bypass")
+        expect(
+            arguments.contains("gemini-test") && arguments.contains("--effort")
+                && arguments.contains("high") && !arguments.contains("gemini-test-high"),
+            "Antigravity receives the model family and a separate effort without conflicting overrides")
         let definition = fixture.read("agy-agent.log")
         expect(
             definition.contains("tools: [finish]") && definition.contains("mcpServers: []")
@@ -165,6 +178,150 @@ struct InstalledAITests {
             expect(removed, "Antigravity removes only its turn's private agent workspace")
         } else {
             expect(false, "Antigravity records its private workspace")
+        }
+    }
+
+    private static let echoTool = AITool(
+        name: "safe_echo", description: "Echo a message",
+        parameters: .object([
+            "type": .string("object"),
+            "properties": .object([
+                "message": .object(["type": .string("string")])
+            ])
+        ]), origin: "Probe")
+
+    private static func antigravityRejectsInvalidStructuredBatches() {
+        let valid: [String: Any] = ["name": "safe_echo", "arguments": "{}"]
+        for output: [String: Any] in [
+            [:], ["text": "answer"],
+            ["text": "answer", "calls": [valid, ["name": "native_shell", "arguments": "{}"]]],
+            ["text": "answer", "calls": [["name": "safe_echo", "arguments": "[]"]]]
+        ] {
+            do {
+                _ = try AntigravityToolProtocol.events(
+                    result: ["structured_output": output], tools: [echoTool])
+                expect(false, "malformed structured batches are rejected")
+            } catch { expect(true, "malformed structured batches are rejected before any call is emitted") }
+        }
+        let raw = Data(
+            #"{"event":"step_update","step_update":{"step_type":"agent_response","text_delta":"{raw JSON}"}}"#
+                .utf8)
+        expect(
+            InstalledAIStreamDecoder.decode(raw, kind: .antigravity, tools: [echoTool]).events.isEmpty,
+            "raw structured deltas are suppressed when tools are offered")
+        let web = Data(
+            #"{"event":"step_update","step_update":{"step_type":"tool","state":"DONE","tool_name":"search_web"}}"#
+                .utf8)
+        expect(
+            InstalledAIStreamDecoder.decode(web, kind: .antigravity).events.isEmpty,
+            "a disabled web turn ignores unsolicited search activity")
+    }
+
+    private static func antigravityWebSearchIsOptIn(_ fixture: Fixture) async {
+        let provider = InstalledCLIProvider(
+            kind: .antigravity, executable: fixture.executables[.antigravity],
+            model: "gemini-test", effort: "low", workspace: fixture.workspace)
+        do {
+            var events: [AIStreamEvent] = []
+            for try await event in provider.stream(
+                AIRequest(
+                    messages: [AIMessage(role: .user, text: "Search")], webSearch: true))
+            { events.append(event) }
+            expect(
+                events.contains(.searching("Oz search")) && events.contains(.searched("Oz search")),
+                "native Antigravity search activity reaches the transcript")
+            expect(
+                fixture.read("agy-agent.log").contains("tools: [finish, search_web, read_url_content]"),
+                "web-enabled turns expose only search and URL tools alongside finish")
+            var disabled: [AIStreamEvent] = []
+            for try await event in provider.stream(
+                AIRequest(
+                    messages: [AIMessage(role: .user, text: "Answer offline")]))
+            { disabled.append(event) }
+            expect(
+                !disabled.contains(.searching("Oz search")), "search is withheld on the next disabled turn")
+            let name =
+                fixture.read("agy-workspace.log").split(separator: "\n").last
+                .map { URL(fileURLWithPath: String($0)).lastPathComponent } ?? ""
+            expect(
+                fixture.read("agy-agent.log").hasSuffix(AntigravityLaunch.agentDefinition(name: name) + "\n"),
+                "search allowlisting is rebuilt for each request")
+        } catch { expect(false, "Antigravity web toggles stream: \(error)") }
+    }
+
+    private static func antigravityRunsOzsToolLoop(_ fixture: Fixture) async {
+        let box = ToolBox()
+        let base = InstalledCLIProvider(
+            kind: .antigravity, executable: fixture.executables[.antigravity],
+            model: "tool-loop", effort: "low", workspace: fixture.workspace)
+        let provider = AIToolLoopProvider(base: base, tools: [echoTool], maxRounds: 3) { call in
+            await MainActor.run { box.calls.append(call) }
+            return AIToolResult(callID: call.id, content: "verified", isError: false)
+        }
+        do {
+            var events: [AIStreamEvent] = []
+            for try await event in provider.stream(
+                AIRequest(
+                    messages: [AIMessage(role: .user, text: "Use safe_echo")], webSearch: true))
+            { events.append(event) }
+            expect(
+                box.calls.count == 1 && box.calls.first?.name == "safe_echo",
+                "Oz executes the offered tool once")
+            let text = events.compactMap {
+                if case .text(let text) = $0 { return text }; return nil
+            }.joined()
+            expect(text == "Tool returned: verified", "structured JSON never leaks into the answer")
+            expect(
+                events.contains {
+                    if case .toolCall(_, "Probe", "safe_echo") = $0 { return true }; return false
+                }
+                    && events.contains {
+                        if case .toolResult(_, false) = $0 { return true }; return false
+                    },
+                "Oz tool activity and results reach the transcript")
+            expect(
+                events.filter { $0 == .finished }.count == 1,
+                "the tool loop finishes only after the final round")
+            expect(
+                fixture.read("agy-content.log").contains("verified")
+                    && fixture.read("agy-content.log").contains("tool_result"),
+                "the next CLI round receives tool results with call IDs")
+            let arguments = fixture.lastArguments("agy-args.log")
+            expect(arguments.contains("--json-schema"), "offered tools constrain the final CLI response")
+        } catch { expect(false, "Antigravity completes a multi-round Oz tool turn: \(error)") }
+    }
+
+    private static func antigravityToolFailuresAndRoundCap(_ fixture: Fixture) async {
+        for model in ["unoffered", "malformed", "repeat"] {
+            let box = ToolBox()
+            let base = InstalledCLIProvider(
+                kind: .antigravity, executable: fixture.executables[.antigravity],
+                model: model, effort: nil, workspace: fixture.workspace)
+            let provider = AIToolLoopProvider(base: base, tools: [echoTool], maxRounds: 2) { call in
+                await MainActor.run { box.calls.append(call) }
+                return .failure(call.id, "declined")
+            }
+            do {
+                for try await _ in provider.stream(
+                    AIRequest(messages: [AIMessage(role: .user, text: "Use tool")]))
+                {}
+                expect(false, "Antigravity rejects \(model)")
+            } catch {
+                expect(
+                    model == "repeat"
+                        ? error.localizedDescription.contains("2 rounds")
+                        : error.localizedDescription.contains("unoffered tool"),
+                    "Antigravity \(model) produces a useful tool failure")
+            }
+            expect(
+                box.calls.count == (model == "repeat" ? 2 : 0),
+                "invalid calls never execute and repeated calls respect the round cap")
+            if model == "repeat" {
+                expect(
+                    fixture.read("agy-content.log").contains("declined")
+                        && fixture.read("agy-content.log").contains("is_error"),
+                    "tool refusals return to Antigravity as error results")
+            }
         }
     }
 
@@ -678,7 +835,11 @@ struct InstalledAITests {
     }
 }
 
-/// What the runner asked about, collected across the actor hop the consent closure makes.
+@MainActor
+private final class ToolBox {
+    var calls: [AIToolCall] = []
+}
+
 @MainActor
 private final class Box {
     var calls: [AIToolServerCall] = []

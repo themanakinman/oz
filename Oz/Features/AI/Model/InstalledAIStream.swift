@@ -15,11 +15,12 @@ struct InstalledAIStreamFrame: Equatable, Sendable {
 
 enum InstalledAIStreamDecoder {
     static func decode(
-        _ data: Data, kind: InstalledAIKind, servers: [AIToolServer] = []
+        _ data: Data, kind: InstalledAIKind, servers: [AIToolServer] = [],
+        tools: [AITool] = [], webSearch: Bool = false
     ) -> InstalledAIStreamFrame {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return InstalledAIStreamFrame() }
-        if kind == .antigravity { return antigravity(object) }
+        if kind == .antigravity { return antigravity(object, tools: tools, webSearch: webSearch) }
         guard let type = object["type"] as? String else { return InstalledAIStreamFrame() }
         switch kind {
         case .openCode: return openCode(object, type: type)
@@ -34,14 +35,23 @@ enum InstalledAIStreamDecoder {
         }
     }
 
-    private static func antigravity(_ object: [String: Any]) -> InstalledAIStreamFrame {
+    private static func antigravity(
+        _ object: [String: Any], tools: [AITool], webSearch: Bool
+    ) -> InstalledAIStreamFrame {
         var frame = InstalledAIStreamFrame()
         switch object["event"] as? String {
         case "step_update":
-            guard let step = object["step_update"] as? [String: Any],
-                step["step_type"] as? String == "agent_response"
-            else { return frame }
-            if let text = step["text_delta"] as? String, !text.isEmpty {
+            guard let step = object["step_update"] as? [String: Any] else { return frame }
+            if webSearch, step["step_type"] as? String == "tool",
+                let name = step["tool_name"] as? String,
+                ["search_web", "read_url_content"].contains(name)
+            {
+                let parameters = (step["tool_info"] as? [String: Any])?["parameters"] as? [String: Any]
+                let query = parameters?["query"] as? String ?? parameters?["url"] as? String
+                frame.events = step["state"] as? String == "DONE" ? [.searched(query)] : [.searching(query)]
+            } else if tools.isEmpty, step["step_type"] as? String == "agent_response",
+                let text = step["text_delta"] as? String, !text.isEmpty
+            {
                 frame.events = [.text(text)]
             }
         case "result":
@@ -52,9 +62,15 @@ enum InstalledAIStreamDecoder {
                     ?? "Antigravity ended without completing the response."
                 return frame
             }
-            frame.fallbackText = result["response"] as? String
+            if tools.isEmpty {
+                frame.fallbackText = result["response"] as? String
+            } else {
+                do { frame.events = try AntigravityToolProtocol.events(result: result, tools: tools) } catch {
+                    frame.error = error.localizedDescription; return frame
+                }
+            }
             if let usage = result["usage"] as? [String: Any] {
-                frame.events = [
+                frame.events += [
                     .usage(
                         AIUsage(
                             inputTokens: integer(usage["input_tokens"]),

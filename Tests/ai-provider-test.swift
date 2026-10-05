@@ -882,14 +882,34 @@ struct AIProviderTests {
         installed.select(.antigravity(model: "old-model", effort: nil))
         installed.reconcile(
             installed: .antigravity,
-            models: [InstalledAIModel(id: "gemini-test-high", name: "Gemini Test (High)")],
+            models: InstalledAIModel.antigravityCatalog(
+                "gemini-test-high\tGemini Test (High)\ngemini-test-low\tGemini Test (Low)"),
             isUnavailable: false)
         let reopenedInstalled = AISettingsStore(
             defaults: antigravityDefaults, isAppleIntelligenceAvailable: { false })
         expect(
             reopenedInstalled.enabledInstalledProviders.contains(.antigravity)
-                && reopenedInstalled.defaultModel == .antigravity(model: "gemini-test-high", effort: nil),
+                && reopenedInstalled.defaultModel == .antigravity(model: "gemini-test", effort: "high"),
             "Antigravity's toggle and reconciled model persist")
+        expect(installed.antigravityPlan == .unspecified, "Antigravity does not guess a subscription tier")
+        installed.antigravityPlan = .pro
+        let withPlan = AISettingsStore(defaults: antigravityDefaults, isAppleIntelligenceAvailable: { false })
+        expect(
+            withPlan.antigravityPlan == .pro && withPlan.antigravityPlan.title == "Google AI Pro",
+            "the account's declared subscription tier persists")
+        installed.select(.antigravity(model: "gemini-test-low", effort: nil))
+        installed.reconcile(
+            installed: .antigravity,
+            models: InstalledAIModel.antigravityCatalog(
+                "gemini-test-high\tGemini Test (High)\ngemini-test-low\tGemini Test (Low)"),
+            isUnavailable: false)
+        expect(
+            installed.defaultModel == .antigravity(model: "gemini-test", effort: "low"),
+            "the effort in a saved Antigravity slug remains selected")
+        let capabilities = AIModelCapabilities.antigravityCommand
+        expect(
+            capabilities.webSearch && capabilities.tools && !capabilities.images && !capabilities.documents,
+            "Antigravity offers search and Oz tools with text attachments")
         reopenedInstalled.setInstalledProviderEnabled(false, for: .antigravity)
         reopenedInstalled.disableInstalledModelSelection(for: .antigravity)
         expect(

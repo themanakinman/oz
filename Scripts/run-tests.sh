@@ -616,6 +616,7 @@ run slow codex-turn-test   Oz/Platform/AppPaths.swift \
                            Oz/Platform/ExecutableLocator.swift \
                            Oz/Features/AI/Service/CodexTurnRunner.swift
 run installed-ai-test     Oz/Features/AI/Model/*.swift \
+                          Oz/Features/AI/Service/AIToolLoopProvider.swift \
                           Oz/Features/AI/Service/AIProvider.swift \
                           Oz/Platform/AppPaths.swift \
                           Oz/Platform/ExecutableLocator.swift \
