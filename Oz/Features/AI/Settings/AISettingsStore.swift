@@ -164,7 +164,8 @@ final class AISettingsStore {
         let selectedModel: String
         switch (kind, defaultModel) {
         case (.claude, .claude(let model, _)), (.grok, .grok(let model, _)),
-            (.openCode, .openCode(let model, _)), (.cursor, .cursor(let model, _)):
+            (.openCode, .openCode(let model, _)), (.cursor, .cursor(let model, _)),
+            (.antigravity, .antigravity(let model, _)):
             selectedModel = model
         default:
             return
@@ -193,6 +194,9 @@ final class AISettingsStore {
         case .cursor:
             defaultModel = .cursor(
                 model: replacement.id, effort: replacement.resolvedEffort(nil))
+        case .antigravity:
+            defaultModel = .antigravity(
+                model: replacement.id, effort: replacement.resolvedEffort(nil))
         case .codex: break
         }
     }
@@ -218,7 +222,7 @@ final class AISettingsStore {
         let matches =
             switch (kind, source) {
             case (.codex, .codex), (.claude, .claude), (.grok, .grok), (.openCode, .openCode),
-                (.cursor, .cursor):
+                (.cursor, .cursor), (.antigravity, .antigravity):
                 true
             default: false
             }

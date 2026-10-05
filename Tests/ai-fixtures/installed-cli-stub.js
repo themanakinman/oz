@@ -145,6 +145,11 @@ if (command === "opencode" && args.slice(0, 2).join(" ") === "session delete") {
   process.exit(0);
 }
 
+if (command === "agy" && args[0] === "models") {
+  console.log("gemini-test-high\tGemini Test (High)\nclaude-test-low\tClaude Test (Low)");
+  process.exit(0);
+}
+
 if (command === "agent") {
   if (args.includes("--version")) {
     console.log("2026.1.0");
@@ -187,7 +192,37 @@ if (model === "oversized-frame") {
   process.exit(0);
 }
 
-if (command === "opencode") {
+if (command === "agy") {
+  const emit = (message) => console.log(JSON.stringify(message));
+  const agentName = args[args.indexOf("--agent") + 1];
+  const agent = path.join(process.cwd(), ".agents/agents", agentName + ".md");
+  record("agy-agent.log", fs.readFileSync(agent, "utf8"));
+  record("agy-agent-mode.log", (fs.statSync(agent).mode & 0o777).toString(8));
+  record("agy-workspace.log", process.cwd());
+  record("agy-autoupdate.log", process.env.AGY_CLI_DISABLE_AUTO_UPDATE ?? "");
+  const request = JSON.parse(prompt);
+  record("agy-content.log", request.message.content);
+  if (model === "waiting") {
+    setInterval(() => {}, 1000);
+    return;
+  }
+  if (model === "failed") {
+    emit({ event: "result", result: { status: "ERROR", error: "authentication required" } });
+    process.exit(1);
+  }
+  if (model !== "final-only") {
+    emit({ event: "step_update", step_update: {
+      step_type: "agent_response", state: "ACTIVE", text_delta: "Antigravity "
+    }});
+    emit({ event: "step_update", step_update: {
+      step_type: "agent_response", state: "DONE", text_delta: "reply"
+    }});
+  }
+  emit({ event: "result", result: {
+    status: "SUCCESS", response: "Antigravity reply",
+    usage: { input_tokens: 20, output_tokens: 4, thinking_tokens: 2, cache_read_tokens: 10 }
+  }});
+} else if (command === "opencode") {
   console.log(JSON.stringify({ type: "step_start", sessionID: "ses_stub", part: {} }));
   console.log(JSON.stringify({
     type: "text", sessionID: "ses_stub", part: { text: "OpenCode reply" }

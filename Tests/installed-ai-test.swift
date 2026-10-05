@@ -38,6 +38,10 @@ struct InstalledAITests {
         openCodeCatalogCarriesModelVariants()
         cursorCatalogParsesListModels()
         grokCatalogParsesListedModels()
+        antigravityCatalogAndSelectionRoundTrip()
+        await antigravityStreamsWithRestrictedAgent(fixture)
+        await antigravityFinalOnlyAndFailedResponses(fixture)
+        await antigravityCancellationRemovesItsWorkspace(fixture)
         statusJSONRecognizesLogin()
         versionKeepsPrereleaseAndBuild()
         await openCodeRunsWithoutToolsAndDeletesItsSession(fixture)
@@ -100,6 +104,105 @@ struct InstalledAITests {
             models.map(\.name) == ["Auto (current, default)", "Composer 2.5", "GPT-5.2"],
             "Cursor discovery keeps each --list-models display name")
         expect(models.allSatisfy(\.efforts.isEmpty), "Cursor model ids carry effort; no separate picker")
+    }
+
+    private static func antigravityCatalogAndSelectionRoundTrip() {
+        let output =
+            "Fetching available models...\ngemini-test-high\tGemini Test (High)\n"
+            + "claude-test-low\tClaude Test (Low)\ngemini-test-high\tDuplicate\n"
+        let models = InstalledAIModel.antigravityCatalog(output)
+        expect(
+            models.map(\.id) == ["gemini-test-high", "claude-test-low"],
+            "Antigravity keeps catalog slugs and ignores diagnostics and duplicates")
+        expect(models.first?.name == "Gemini Test (High)", "Antigravity keeps display names")
+        expect(models.allSatisfy(\.efforts.isEmpty), "Antigravity effort is already in each slug")
+        let selection = AIModelSelection.antigravity(model: "gemini-test-high", effort: nil)
+        let encoded = try? JSONEncoder().encode(selection)
+        let decoded = encoded.flatMap { try? JSONDecoder().decode(AIModelSelection.self, from: $0) }
+        expect(
+            decoded == selection && selection.source == .antigravity,
+            "Antigravity selections survive saved conversation round trips")
+        expect(!selection.runsItsOwnTools, "Antigravity never receives Oz's MCP servers")
+        for status in ["ERROR", "CANCELED", "INTERRUPTED", "INVALID", "WAITING", "RUNNING"] {
+            let data = Data("{\"event\":\"result\",\"result\":{\"status\":\"\(status)\"}}".utf8)
+            let frame = InstalledAIStreamDecoder.decode(data, kind: .antigravity)
+            expect(frame.error != nil && !frame.completed, "Antigravity \(status) cannot finish a reply")
+        }
+    }
+
+    private static func antigravityStreamsWithRestrictedAgent(_ fixture: Fixture) async {
+        let events = await fixture.events(kind: .antigravity, model: "gemini-test-high", effort: nil)
+        let text = events.compactMap { event -> String? in
+            if case .text(let value) = event { return value }
+            return nil
+        }.joined()
+        expect(text == "Antigravity reply", "Antigravity deltas do not duplicate the final response")
+        expect(events.last == .finished, "Antigravity terminal SUCCESS finishes the stream")
+        expect(
+            events.contains(
+                .usage(
+                    AIUsage(
+                        inputTokens: 20, outputTokens: 4,
+                        cachedInputTokens: 10, reasoningTokens: 2))), "Antigravity reports final token usage")
+        let arguments = fixture.arguments("agy-args.log")
+        expect(
+            arguments.contains("--agent") && arguments.contains { $0.hasPrefix("oz-chat-") }
+                && arguments.contains("--input-format") && arguments.contains("--disable-slash-commands")
+                && !arguments.contains("--dangerously-skip-permissions"),
+            "Antigravity runs the restricted agent with framed stdin and no approval bypass")
+        let definition = fixture.read("agy-agent.log")
+        expect(
+            definition.contains("tools: [finish]") && definition.contains("mcpServers: []")
+                && definition.contains("commandExecutionPolicy: off"),
+            "Antigravity's agent cannot use native file, command or MCP tools")
+        expect(fixture.read("agy-agent-mode.log").contains("600"), "agent configuration is private")
+        expect(
+            fixture.read("agy-autoupdate.log").contains("true"), "Antigravity cannot auto-update Oz's child")
+        fixture.expectPrompt("agy-content.log")
+        let workspace = fixture.read("agy-workspace.log").split(separator: "\n").first.map(String.init)
+        if let workspace {
+            let removed = await fixture.awaitMissing(URL(fileURLWithPath: workspace))
+            expect(removed, "Antigravity removes only its turn's private agent workspace")
+        } else {
+            expect(false, "Antigravity records its private workspace")
+        }
+    }
+
+    private static func antigravityFinalOnlyAndFailedResponses(_ fixture: Fixture) async {
+        let events = await fixture.events(kind: .antigravity, model: "final-only", effort: nil)
+        expect(events.contains(.text("Antigravity reply")), "Antigravity final-only responses retain text")
+        let error = await fixture.streamError(kind: .antigravity, model: "failed", effort: nil)
+        expect(
+            error?.contains("authentication required") == true,
+            "Antigravity structured errors reach the user")
+    }
+
+    private static func antigravityCancellationRemovesItsWorkspace(_ fixture: Fixture) async {
+        let previous = fixture.read("agy-workspace.log")
+        let provider = InstalledCLIProvider(
+            kind: .antigravity,
+            executable: fixture.executables[.antigravity], model: "waiting", effort: nil,
+            workspace: fixture.workspace)
+        let task = Task {
+            for try await _ in provider.stream(
+                AIRequest(
+                    instructions: nil,
+                    messages: [AIMessage(role: .user, text: "Wait")]))
+            {}
+        }
+        let deadline = ContinuousClock.now + .seconds(5)
+        while fixture.read("agy-workspace.log") == previous, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        let path = fixture.read("agy-workspace.log").split(separator: "\n").last.map(String.init)
+        task.cancel()
+        _ = await task.result
+        if let path {
+            let removed = await fixture.awaitMissing(URL(fileURLWithPath: path))
+            expect(removed, "canceling Antigravity removes its private agent workspace")
+        } else {
+            expect(false, "canceling Antigravity starts a turn first")
+        }
     }
 
     private static func statusJSONRecognizesLogin() {

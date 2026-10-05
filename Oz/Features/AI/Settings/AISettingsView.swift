@@ -253,6 +253,7 @@ struct AISettingsView: View {
             installedConnection(.grok)
             installedConnection(.openCode)
             installedConnection(.cursor)
+            installedConnection(.antigravity)
         } header: {
             SettingsSectionHeader(.aiInstalledAI)
         } footer: {

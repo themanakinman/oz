@@ -5,6 +5,7 @@ struct InstalledAIStreamFrame: Equatable, Sendable {
     var sessionID: String?
     var error: String?
     var completed = false
+    var fallbackText: String?
     /// A tool call the CLI is holding open; the runner answers it and the turn carries on.
     var controlRequest: ClaudeControlProtocol.Request?
     var unsupportedRequestID: String?
@@ -16,9 +17,10 @@ enum InstalledAIStreamDecoder {
     static func decode(
         _ data: Data, kind: InstalledAIKind, servers: [AIToolServer] = []
     ) -> InstalledAIStreamFrame {
-        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let type = object["type"] as? String
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return InstalledAIStreamFrame() }
+        if kind == .antigravity { return antigravity(object) }
+        guard let type = object["type"] as? String else { return InstalledAIStreamFrame() }
         switch kind {
         case .openCode: return openCode(object, type: type)
         case .claude: return claude(object, type: type, servers: servers)
@@ -28,8 +30,44 @@ enum InstalledAIStreamDecoder {
             var frame = claude(object, type: type, servers: [])
             frame.sessionID = object["session_id"] as? String
             return frame
-        case .codex: return InstalledAIStreamFrame()
+        case .codex, .antigravity: return InstalledAIStreamFrame()
         }
+    }
+
+    private static func antigravity(_ object: [String: Any]) -> InstalledAIStreamFrame {
+        var frame = InstalledAIStreamFrame()
+        switch object["event"] as? String {
+        case "step_update":
+            guard let step = object["step_update"] as? [String: Any],
+                step["step_type"] as? String == "agent_response"
+            else { return frame }
+            if let text = step["text_delta"] as? String, !text.isEmpty {
+                frame.events = [.text(text)]
+            }
+        case "result":
+            guard let result = object["result"] as? [String: Any] else { return frame }
+            guard result["status"] as? String == "SUCCESS" else {
+                frame.error =
+                    result["error"] as? String
+                    ?? "Antigravity ended without completing the response."
+                return frame
+            }
+            frame.fallbackText = result["response"] as? String
+            if let usage = result["usage"] as? [String: Any] {
+                frame.events = [
+                    .usage(
+                        AIUsage(
+                            inputTokens: integer(usage["input_tokens"]),
+                            outputTokens: integer(usage["output_tokens"]),
+                            cachedInputTokens: integer(usage["cache_read_tokens"]),
+                            reasoningTokens: integer(usage["thinking_tokens"])))
+                ]
+            }
+            frame.completed = true
+        default:
+            break
+        }
+        return frame
     }
 
     private static func openCode(
@@ -126,9 +164,12 @@ enum InstalledAIStreamDecoder {
                 guard let id = block["id"] as? String, let name = block["name"] as? String,
                     let call = ClaudeMCPLaunch.route(name)
                 else { return nil }
-                let input = (try? JSONSerialization.data(withJSONObject: block["input"] ?? [:], options: [.fragmentsAllowed]))
+                let input =
+                    (try? JSONSerialization.data(
+                        withJSONObject: block["input"] ?? [:], options: [.fragmentsAllowed]))
                     .flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
-                let title = call.handle == AIFileTools.handle
+                let title =
+                    call.handle == AIFileTools.handle
                     ? AIFileTools.activity(name: call.tool, arguments: input) : nil
                 return .toolCall(
                     id: id, origin: AIToolServerRow.title(of: call.handle, in: servers),

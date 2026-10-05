@@ -446,7 +446,7 @@ final class AIChatCoordinator {
         case .appleIntelligence?: return .appleIntelligence
         case .codex?: return .codex
         case .claude?: return .claudeCommand
-        case .grok?, .openCode?, .cursor?:
+        case .grok?, .openCode?, .cursor?, .antigravity?:
             return AIModelCapabilities(
                 images: false, documents: false, webSearch: false, tools: false)
         case .api(let connection, let model, _)?:
@@ -617,7 +617,7 @@ final class AIChatCoordinator {
         core.aiSettings.enabledInstalledProviders.contains { kind in
             switch kind {
             case .codex: core.chatGPTSubscription.phase == .starting
-            case .claude, .grok, .openCode, .cursor:
+            case .claude, .grok, .openCode, .cursor, .antigravity:
                 core.installedAI.status(for: kind).phase == .checking
             }
         }
@@ -642,7 +642,7 @@ final class AIChatCoordinator {
             return true
         case .api(let connection, let model, _):
             return core.aiSettings.connection(id: connection)?.models.contains(model) == true
-        case .codex, .claude, .grok, .openCode, .cursor:
+        case .codex, .claude, .grok, .openCode, .cursor, .antigravity:
             return selection.source.installedKind.map {
                 core.aiSettings.enabledInstalledProviders.contains($0)
             } ?? false
@@ -693,6 +693,7 @@ final class AIChatCoordinator {
         case .claude?: return .asset(AIBrand.claude.assetName)
         case .grok?: return .asset(AIBrand.x.assetName)
         case .cursor?: return AIModelOption.cursorIcon
+        case .antigravity(let model, _)?: return AIModelOption.icon(AIBrand.resolve(model: model))
         case .openCode(let model, _)?: return AIModelOption.icon(AIBrand.resolve(model: model))
         case .api(let connection, let model, _)?:
             return AIModelOption.icon(

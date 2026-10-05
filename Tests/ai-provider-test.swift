@@ -870,6 +870,32 @@ struct AIProviderTests {
                 && !AIModelSelection.codex(model: "gpt-5", effort: nil).isOnDevice,
             "only the on-device selection reads as on device")
 
+        let antigravitySuite = "AIProviderTests.antigravity"
+        let antigravityDefaults = isolatedDefaults(antigravitySuite)
+        defer { discardSuite(antigravitySuite, antigravityDefaults) }
+        let installed = AISettingsStore(
+            defaults: antigravityDefaults, isAppleIntelligenceAvailable: { false })
+        expect(
+            !installed.enabledInstalledProviders.contains(.antigravity),
+            "Antigravity discovery is off on an unconfigured Mac")
+        installed.setInstalledProviderEnabled(true, for: .antigravity)
+        installed.select(.antigravity(model: "old-model", effort: nil))
+        installed.reconcile(
+            installed: .antigravity,
+            models: [InstalledAIModel(id: "gemini-test-high", name: "Gemini Test (High)")],
+            isUnavailable: false)
+        let reopenedInstalled = AISettingsStore(
+            defaults: antigravityDefaults, isAppleIntelligenceAvailable: { false })
+        expect(
+            reopenedInstalled.enabledInstalledProviders.contains(.antigravity)
+                && reopenedInstalled.defaultModel == .antigravity(model: "gemini-test-high", effort: nil),
+            "Antigravity's toggle and reconciled model persist")
+        reopenedInstalled.setInstalledProviderEnabled(false, for: .antigravity)
+        reopenedInstalled.disableInstalledModelSelection(for: .antigravity)
+        expect(
+            reopenedInstalled.defaultModel == nil,
+            "disabling Antigravity removes the selected route without picking another network provider")
+
         let legacy = Data(#"{"chatGPT":{"model":"gpt-5","effort":"high"}}"#.utf8)
         expect(
             (try? JSONDecoder().decode(AIModelSelection.self, from: legacy))

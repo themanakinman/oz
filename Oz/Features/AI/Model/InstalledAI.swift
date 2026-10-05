@@ -6,9 +6,10 @@ enum InstalledAIKind: String, CaseIterable, Codable, Identifiable, Sendable {
     case grok
     case openCode
     case cursor
+    case antigravity
 
-    /// Claude, Grok, OpenCode and Cursor — Codex uses its app-server instead.
-    static let managedCLIKinds: [InstalledAIKind] = [.claude, .grok, .openCode, .cursor]
+    /// Codex uses its app-server instead of this CLI transport.
+    static let managedCLIKinds: [InstalledAIKind] = [.claude, .grok, .openCode, .cursor, .antigravity]
 
     var id: String { rawValue }
 
@@ -19,6 +20,7 @@ enum InstalledAIKind: String, CaseIterable, Codable, Identifiable, Sendable {
         case .grok: return "Grok"
         case .openCode: return "OpenCode"
         case .cursor: return "Cursor"
+        case .antigravity: return "Antigravity"
         }
     }
 
@@ -29,6 +31,7 @@ enum InstalledAIKind: String, CaseIterable, Codable, Identifiable, Sendable {
         case .grok: return "grok"
         case .openCode: return "opencode"
         case .cursor: return "agent"
+        case .antigravity: return "agy"
         }
     }
 
@@ -39,6 +42,7 @@ enum InstalledAIKind: String, CaseIterable, Codable, Identifiable, Sendable {
         case .grok: return URL(string: "https://x.ai/cli")!
         case .openCode: return URL(string: "https://opencode.ai/docs")!
         case .cursor: return URL(string: "https://cursor.com/docs/cli/overview")!
+        case .antigravity: return URL(string: "https://antigravity.google/docs/cli/install/")!
         }
     }
 
@@ -47,7 +51,7 @@ enum InstalledAIKind: String, CaseIterable, Codable, Identifiable, Sendable {
         switch self {
         case .claude: return [".claude/local/claude"]
         case .grok: return [".grok/bin/grok"]
-        case .codex, .openCode, .cursor: return []
+        case .codex, .openCode, .cursor, .antigravity: return []
         }
     }
 
@@ -58,6 +62,7 @@ enum InstalledAIKind: String, CaseIterable, Codable, Identifiable, Sendable {
         case .grok: return .grok
         case .openCode: return .openCode
         case .cursor: return .cursor
+        case .antigravity: return .antigravity
         }
     }
 
@@ -65,6 +70,7 @@ enum InstalledAIKind: String, CaseIterable, Codable, Identifiable, Sendable {
     func isolationCaveat(hasManagedMCPPolicy: Bool) -> String? {
         switch self {
         case .cursor: return "Ask mode · your Cursor MCP servers still apply"
+        case .antigravity: return "Text only · Antigravity keeps its own conversation history"
         case .claude:
             return hasManagedMCPPolicy
                 ? "MCP on this route is managed by your organization" : nil
@@ -79,6 +85,7 @@ enum InstalledAIKind: String, CaseIterable, Codable, Identifiable, Sendable {
         case .grok: return "grok login"
         case .openCode: return "opencode auth login"
         case .cursor: return "agent login"
+        case .antigravity: return "agy"
         }
     }
 }
@@ -92,6 +99,7 @@ extension AIModelSource {
         case .grok: return .grok
         case .openCode: return .openCode
         case .cursor: return .cursor
+        case .antigravity: return .antigravity
         case .appleIntelligence, .api: return nil
         }
     }
@@ -264,6 +272,18 @@ struct InstalledAIModel: Equatable, Identifiable, Sendable {
         return models
     }
 
+    static func antigravityCatalog(_ output: String) -> [InstalledAIModel] {
+        var seen = Set<String>()
+        return output.split(whereSeparator: \.isNewline).compactMap { line in
+            let fields = line.split(maxSplits: 1, whereSeparator: \.isWhitespace)
+            guard fields.count == 2 else { return nil }
+            let id = String(fields[0])
+            let name = fields[1].trimmingCharacters(in: .whitespaces)
+            guard id.contains("-"), !name.isEmpty, seen.insert(id).inserted else { return nil }
+            return InstalledAIModel(id: id, name: name)
+        }
+    }
+
     private static func effortOrder(_ lhs: String, _ rhs: String) -> Bool {
         let order = ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
         let left = order.firstIndex(of: lhs) ?? order.endIndex
@@ -288,4 +308,31 @@ struct InstalledAIStatus: Equatable, Sendable {
     var models: [InstalledAIModel] = []
 
     var isReady: Bool { phase == .ready && executable != nil && !models.isEmpty }
+}
+
+enum AntigravityLaunch {
+    static func agentDefinition(name: String) -> String {
+        """
+        ---
+        name: \(name)
+        description: Text responses inside Oz.
+        mainAgent: true
+        subagent: false
+        tools: [finish]
+        mcpServers: []
+        skills: []
+        plugins: []
+        commandExecutionPolicy: off
+        ---
+        You are a text assistant inside Oz. Use only the provided conversation and instructions.
+        Never access files, commands, browsers, other agents or external resources.
+        """
+    }
+
+    static func userMessage(_ prompt: String) throws -> Data {
+        let object: [String: Any] = ["event": "user", "message": ["content": prompt]]
+        var data = try JSONSerialization.data(withJSONObject: object)
+        data.append(0x0A)
+        return data
+    }
 }

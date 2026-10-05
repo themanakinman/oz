@@ -61,6 +61,8 @@ private final class InstalledCLITurnRunner {
     private var outputBuffer = Data()
     private var errorBuffer = Data()
     private var turnSessionID: String?
+    private var antigravityWorkspace: URL?
+    private var hasStreamedText = false
     private var promptFileURL: URL?
     private var activeExecutable: URL?
     /// What this turn armed, empty on every route and every turn that offers no server.
@@ -133,6 +135,7 @@ private final class InstalledCLITurnRunner {
             return
         }
         cancelActiveTurn()
+        hasStreamedText = false
         do {
             try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
             try FileManager.default.setAttributes(
@@ -163,12 +166,22 @@ private final class InstalledCLITurnRunner {
             configURL = url
         }
 
+        if kind == .antigravity {
+            do {
+                antigravityWorkspace = try await Self.prepareAntigravityWorkspace(in: workspace)
+            } catch {
+                continuation.finish(
+                    throwing: AIProviderError.unavailable(
+                        "Oz could not prepare its Antigravity agent."))
+                return
+            }
+        }
         let process = Process()
         let stdin = Pipe()
         let stdout = Pipe()
         let stderr = Pipe()
         process.executableURL = executable
-        process.currentDirectoryURL = workspace
+        process.currentDirectoryURL = antigravityWorkspace ?? workspace
         process.environment = environment(for: executable)
         var grokPrompt: URL?
         if kind == .grok {
@@ -211,6 +224,7 @@ private final class InstalledCLITurnRunner {
             process.terminationHandler = nil
             if let grokPrompt { try? FileManager.default.removeItem(at: grokPrompt) }
             if let configURL { try? FileManager.default.removeItem(at: configURL) }
+            removeAntigravityWorkspace()
             continuation.finish(throwing: CancellationError())
             return
         }
@@ -222,6 +236,7 @@ private final class InstalledCLITurnRunner {
             process.terminationHandler = nil
             if let grokPrompt { try? FileManager.default.removeItem(at: grokPrompt) }
             if let configURL { try? FileManager.default.removeItem(at: configURL) }
+            removeAntigravityWorkspace()
             continuation.finish(
                 throwing: AIProviderError.responseFailed(
                     kind.title + " could not start: " + error.localizedDescription))
@@ -237,6 +252,14 @@ private final class InstalledCLITurnRunner {
         input = stdin.fileHandleForWriting
         // A child that exits before reading must fail the write, not SIGPIPE Oz.
         _ = fcntl(stdin.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
+        if kind == .antigravity {
+            do {
+                write(try AntigravityLaunch.userMessage(prompt), closing: true)
+            } catch {
+                fail("Oz could not frame the Antigravity request.")
+            }
+            return
+        }
         guard kind == .claude else {
             write(Data(prompt.utf8), closing: true)
             return
@@ -249,6 +272,31 @@ private final class InstalledCLITurnRunner {
         }
         // A tool loop answers on the same pipe, so an armed turn keeps stdin open for it.
         write(line, closing: activeServers.isEmpty)
+    }
+
+    nonisolated private static func prepareAntigravityWorkspace(in root: URL) async throws -> URL {
+        try await Task.detached {
+            let directory = root.appending(path: "oz-chat-\(UUID().uuidString)")
+            let agents = directory.appending(path: ".agents/agents")
+            do {
+                try FileManager.default.createDirectory(
+                    at: agents, withIntermediateDirectories: true,
+                    attributes: [.posixPermissions: 0o700])
+                try await Self.writePrivateFile(
+                    AntigravityLaunch.agentDefinition(name: directory.lastPathComponent),
+                    to: agents.appending(path: directory.lastPathComponent + ".md"))
+                return directory
+            } catch {
+                try? FileManager.default.removeItem(at: directory)
+                throw error
+            }
+        }.value
+    }
+
+    private func removeAntigravityWorkspace() {
+        guard let directory = antigravityWorkspace else { return }
+        antigravityWorkspace = nil
+        Task.detached { try? FileManager.default.removeItem(at: directory) }
     }
 
     /// A pipe write past the buffer blocks until the child drains it, so never on the main actor.
@@ -351,6 +399,14 @@ private final class InstalledCLITurnRunner {
             ]
             if let effort { result += ["--effort", effort] }
             return result
+        case .antigravity:
+            return [
+                "--agent", antigravityWorkspace?.lastPathComponent ?? "",
+                "--model", model,
+                "--input-format", "stream-json",
+                "--output-format", "stream-json",
+                "--disable-slash-commands"
+            ]
         case .cursor:
             return [
                 "-p",
@@ -385,6 +441,8 @@ private final class InstalledCLITurnRunner {
         case .grok:
             result["GROK_DISABLE_AUTOUPDATER"] = "1"
             result["GROK_AGENT_DASHBOARD"] = "0"
+        case .antigravity:
+            result["AGY_CLI_DISABLE_AUTO_UPDATE"] = "true"
         case .cursor, .codex:
             break
         }
@@ -448,7 +506,14 @@ private final class InstalledCLITurnRunner {
             }
             return
         }
-        for event in frame.events { continuation?.yield(event) }
+        for event in frame.events {
+            if case .text(let text) = event, !text.isEmpty { hasStreamedText = true }
+            continuation?.yield(event)
+        }
+        if !hasStreamedText, let text = frame.fallbackText, !text.isEmpty {
+            continuation?.yield(.text(text))
+            hasStreamedText = true
+        }
         if frame.stoppedAtRoundCap {
             fail(
                 roundCap.map { "Stopped after \($0) rounds of tool calls." }
@@ -518,6 +583,7 @@ private final class InstalledCLITurnRunner {
     }
 
     private func cancelActiveTurn() {
+        removeAntigravityWorkspace()
         cancelConsents()
         continuation?.finish(throwing: CancellationError())
         continuation = nil
@@ -558,7 +624,7 @@ private final class InstalledCLITurnRunner {
         case .cursor:
             let root = Self.cursorChatsRoot()
             Task.detached { Self.deleteCursorChat(sessionID, root: root) }
-        case .claude, .codex:
+        case .claude, .codex, .antigravity:
             break
         }
     }
@@ -600,6 +666,8 @@ private final class InstalledCLITurnRunner {
     }
 
     private func cleanup() {
+        removeAntigravityWorkspace()
+        hasStreamedText = false
         cancelConsents()
         process?.terminationHandler = nil
         (process?.standardOutput as? Pipe)?.fileHandleForReading.readabilityHandler = nil
