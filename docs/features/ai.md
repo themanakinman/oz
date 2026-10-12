@@ -632,7 +632,9 @@ login shell, so a stale copy in another prefix never shadows the one Terminal ru
 names no absolute executable does it fall back to the app's PATH, the normal Homebrew and local-bin
 locations and every nvm Node version, newest first — a fallback that can pick a different copy. The
 commands are never installed by Oz; Settings links to their own install docs and offers a sign-in
-command to copy. `InstalledAIManager` probes Claude, Grok, OpenCode and Cursor off-main, in parallel.
+command to copy. Codex's MCP listing and app-server use the same launch environment, with the
+located executable's directory on PATH so npm installs can find their Node runtime from Finder.
+`InstalledAIManager` probes Claude, Grok, OpenCode and Cursor off-main, in parallel.
 Claude's auth status gates an `initialize` control request, and `InstalledAIModel.claudeCatalog` builds
 its model list from the answer; a successful Grok or OpenCode model list is both its auth check and
 catalog; Cursor's `status --format json` gates `--list-models`.

@@ -17,6 +17,7 @@ struct CodexTurnTests {
     }
 
     static func main() async {
+        await aNodeInstallStartsWithFindersPath()
         await stopBeforeTurnStartedStillInterrupts()
         await aTurnNamedTwiceIsInterruptedOnce()
         await ozsServersAreLaunchedAndTheUsersOwnAreNot()
@@ -38,6 +39,31 @@ struct CodexTurnTests {
 
         print("\(passes) passed, \(failures) failed")
         if failures > 0 { exit(1) }
+    }
+
+    static func aNodeInstallStartsWithFindersPath() async {
+        let inherited = ProcessInfo.processInfo.environment["PATH"] ?? ""
+        guard let node = await ExecutableLocator.locate("node"),
+            let server = StubServer(mode: "mcp")
+        else {
+            expect(false, "the Node-backed stub installs")
+            return
+        }
+        defer {
+            setenv("PATH", inherited, 1)
+            server.tearDown()
+        }
+        let bin = server.root.appending(path: "bin")
+        do {
+            try FileManager.default.createSymbolicLink(at: bin.appending(path: "node"),
+                withDestinationURL: node)
+            setenv("PATH", "/usr/bin:/bin:/usr/sbin:/sbin", 1)
+            try await server.client.start()
+            expect(server.client.isRunning && !server.listArgv.isEmpty,
+                "the MCP list and app-server both find Node beside the located Codex executable")
+        } catch {
+            expect(false, "a Node-backed Codex starts with Finder's PATH: \(error.localizedDescription)")
+        }
     }
 
     /// The launch is the boundary: ours named, the reader's disabled, their config never written.
@@ -577,6 +603,8 @@ final class StubServer {
                 at: URL(fileURLWithPath: "Tests/ai-fixtures/codex-stub.js"), to: executable)
             try FileManager.default.setAttributes(
                 [.posixPermissions: 0o755], ofItemAtPath: executable.path)
+            try "export PATH=\"\(executable.deletingLastPathComponent().path):$PATH\"\n".write(
+                to: root.appending(path: ".zprofile"), atomically: true, encoding: .utf8)
         } catch {
             print("the stub app-server could not be installed: \(error)")
             return nil
