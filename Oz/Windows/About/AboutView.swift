@@ -76,7 +76,7 @@ struct AboutView: View {
                 .font(.caption)
             }
 
-            Text("A tiny, native macOS launcher.")
+            Text("Open-source TinyCast fork, redesigned by Jhené Ekuwem.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
@@ -122,7 +122,7 @@ struct AboutView: View {
     }
 
     private var footer: some View {
-        Text("© 2026 Abue Ammar · Released under AGPL-3.0")
+        Text("© 2026 Jhené Ekuwem · Original project by Abue Ammar · AGPL-3.0")
             .font(.caption2)
             .foregroundStyle(.tertiary)
     }
@@ -144,23 +144,28 @@ private struct AboutLink: Identifiable {
 
     static let all: [AboutLink] = [
         AboutLink(
-            id: "website", glyph: .symbol("globe"), title: "Website",
+            id: "website", glyph: .symbol("globe"), title: "Upstream Website",
             detail: "oz.dev",
             url: URL(string: "https://oz.dev/")!),
         AboutLink(
             id: "github", glyph: .brand("BrandGitHub"), title: "GitHub",
-            detail: "github.com/abue-ammar/oz",
+            detail: "github.com/themanakinman/oz",
+            url: URL(string: "https://github.com/themanakinman/oz")!),
+        AboutLink(
+            id: "upstream", glyph: .brand("BrandGitHub"), title: "Original Project",
+            detail: "github.com/abue-ammar/oz · Abue Ammar",
             url: URL(string: "https://github.com/abue-ammar/oz")!),
         AboutLink(
-            id: "discord", glyph: .brand("BrandDiscord"), title: "Discord",
-            detail: "Join the Oz community",
+            id: "discord", glyph: .brand("BrandDiscord"), title: "Upstream Discord",
+            detail: "Original Oz community",
             url: URL(string: "https://discord.gg/v2Eeb4QQy3")!),
         AboutLink(
-            id: "x", glyph: .brand("BrandX"), title: "X", detail: "@abue_ammar",
-            url: URL(string: "https://x.com/abue_ammar")!),
+            id: "linkedin", glyph: .symbol("person.crop.circle"), title: "LinkedIn",
+            detail: "linkedin.com/in/ekuwem",
+            url: URL(string: "https://www.linkedin.com/in/ekuwem/")!),
         AboutLink(
             id: "email", glyph: .symbol("envelope"), title: "Email",
-            detail: "iabueammar@gmail.com", url: URL(string: "mailto:iabueammar@gmail.com")!)
+            detail: "ekuwemo@gmail.com", url: URL(string: "mailto:ekuwemo@gmail.com")!)
     ]
 }
 

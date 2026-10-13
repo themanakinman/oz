@@ -69,6 +69,7 @@ enum AppSettingsKey: String, CaseIterable {
     case menuBarLinkedEventsOnly = "menuBarLinkedEventsOnly"
     case hideCurrentEvent = "hideCurrentEvent"
     case aiEnabled = "aiEnabled"
+    case aiAntigravityPlan = "aiAntigravityPlan"
     case aiInstalledProviders = "aiInstalledProviders"
     case aiConnections = "aiConnections"
     case aiDefaultModel = "aiDefaultModel"

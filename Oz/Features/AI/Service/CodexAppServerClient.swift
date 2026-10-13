@@ -74,22 +74,13 @@ final class CodexAppServerClient {
 
     /// The reader's own servers, read under the app-server's flags; `nil` when that fails.
     nonisolated private static func foreignServerNames(
-        executable: URL, workspace: URL, codexHome: URL?
+        executable: URL, workspace: URL, environment: [String: String]
     ) async -> [String]? {
-        var environment = ProcessInfo.processInfo.environment
-        environment["NO_COLOR"] = "1"
-        environment["PATH"] = commandPath(executable: executable, environment: environment)
-        if let codexHome { environment["CODEX_HOME"] = codexHome.path }
         let result = await InstalledAIProbe.run(
             executable: executable, arguments: configurationFlags + ["mcp", "list", "--json"],
             workspace: workspace, environment: environment)
         guard result.status == 0 else { return nil }
         return CodexMCPLaunch.foreignNames(listing: result.output)
-    }
-
-    nonisolated private static func commandPath(executable: URL, environment: [String: String]) -> String {
-        ([executable.deletingLastPathComponent().path, "/opt/homebrew/bin", "/usr/local/bin"]
-            + [environment["PATH"] ?? "/usr/bin:/bin"]).joined(separator: ":")
     }
 
     var isRunning: Bool { process?.isRunning == true }
@@ -147,10 +138,25 @@ final class CodexAppServerClient {
             throw ClientError.launchFailed("Its private support folder could not be prepared.")
         }
 
+        let inheritedPath = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
+        let commandPaths = [
+            executable.deletingLastPathComponent().path,
+            "/opt/homebrew/bin",
+            "/usr/local/bin"
+        ]
+        var environment = ProcessInfo.processInfo.environment.merging(
+            [
+                "NO_COLOR": "1",
+                "PATH": (commandPaths + [inheritedPath]).joined(separator: ":")
+            ]
+        ) { _, value in value }
+        // Tests can isolate app-server state; production deliberately inherits the user's Codex home.
+        if let codexHome { environment["CODEX_HOME"] = codexHome.path }
+
         // Unread, the reader's servers would start inside the chat; so Codex does not start either.
         guard
             let foreign = await Self.foreignServerNames(
-                executable: executable, workspace: workspace, codexHome: codexHome)
+                executable: executable, workspace: workspace, environment: environment)
         else {
             throw ClientError.launchFailed(
                 "Oz could not read which MCP servers your Codex configuration runs, so it "
@@ -179,12 +185,7 @@ final class CodexAppServerClient {
             + CodexMCPLaunch.arguments(servers: toolServers, disabling: foreign)
             + ["app-server"]
         process.currentDirectoryURL = workspace
-        var environment = ProcessInfo.processInfo.environment
-        environment["NO_COLOR"] = "1"
-        environment["PATH"] = Self.commandPath(executable: executable, environment: environment)
         environment.merge(secrets) { _, new in new }
-        // Tests can isolate app-server state; production deliberately inherits the user's Codex home.
-        if let codexHome { environment["CODEX_HOME"] = codexHome.path }
         process.environment = environment
         process.standardInput = stdin
         process.standardOutput = stdout

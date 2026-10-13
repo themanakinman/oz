@@ -178,6 +178,33 @@ final class InstalledAIManager {
         else {
             return (kind, InstalledAIStatus(phase: .notInstalled))
         }
+        if kind == .antigravity {
+            let result = await InstalledAIProbe.run(
+                executable: executable, arguments: ["models"], workspace: workspace,
+                environment: ProcessInfo.processInfo.environment.merging(
+                    ["AGY_CLI_DISABLE_AUTO_UPDATE": "true", "NO_COLOR": "1"]
+                ) { _, value in value },
+                timeout: .seconds(30), includesStandardError: true)
+            let catalog =
+                result.status == 0
+                ? InstalledAIModel.antigravityCatalog(result.output) : []
+            let output = result.output.lowercased()
+            let needsSignIn = [
+                "authentication required", "not authenticated", "not logged in",
+                "sign in", "login required"
+            ].contains { output.contains($0) }
+            let phase: InstalledAIStatus.Phase =
+                !catalog.isEmpty
+                ? .ready
+                : needsSignIn
+                    ? .signInRequired
+                    : .failed("Antigravity could not list models. Run agy in Terminal, then Check Again.")
+            return (
+                kind,
+                InstalledAIStatus(
+                    phase: phase, executable: executable, models: catalog)
+            )
+        }
         let versionResult = await InstalledAIProbe.run(
             executable: executable, arguments: ["--version"], workspace: workspace)
         guard versionResult.status == 0 else {
@@ -262,7 +289,7 @@ final class InstalledAIManager {
                             "Cursor returned no models."),
                     version: version, executable: executable, models: catalog)
             )
-        case .codex:
+        case .codex, .antigravity:
             return (kind, InstalledAIStatus(phase: .idle))
         }
     }

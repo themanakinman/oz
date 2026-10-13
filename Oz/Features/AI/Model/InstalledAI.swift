@@ -6,9 +6,10 @@ enum InstalledAIKind: String, CaseIterable, Codable, Identifiable, Sendable {
     case grok
     case openCode
     case cursor
+    case antigravity
 
-    /// Claude, Grok, OpenCode and Cursor — Codex uses its app-server instead.
-    static let managedCLIKinds: [InstalledAIKind] = [.claude, .grok, .openCode, .cursor]
+    /// Codex uses its app-server instead of this CLI transport.
+    static let managedCLIKinds: [InstalledAIKind] = [.claude, .grok, .openCode, .cursor, .antigravity]
 
     var id: String { rawValue }
 
@@ -19,6 +20,7 @@ enum InstalledAIKind: String, CaseIterable, Codable, Identifiable, Sendable {
         case .grok: return "Grok"
         case .openCode: return "OpenCode"
         case .cursor: return "Cursor"
+        case .antigravity: return "Antigravity"
         }
     }
 
@@ -29,6 +31,7 @@ enum InstalledAIKind: String, CaseIterable, Codable, Identifiable, Sendable {
         case .grok: return "grok"
         case .openCode: return "opencode"
         case .cursor: return "agent"
+        case .antigravity: return "agy"
         }
     }
 
@@ -39,6 +42,7 @@ enum InstalledAIKind: String, CaseIterable, Codable, Identifiable, Sendable {
         case .grok: return URL(string: "https://x.ai/cli")!
         case .openCode: return URL(string: "https://opencode.ai/docs")!
         case .cursor: return URL(string: "https://cursor.com/docs/cli/overview")!
+        case .antigravity: return URL(string: "https://antigravity.google/docs/cli/install/")!
         }
     }
 
@@ -47,7 +51,7 @@ enum InstalledAIKind: String, CaseIterable, Codable, Identifiable, Sendable {
         switch self {
         case .claude: return [".claude/local/claude"]
         case .grok: return [".grok/bin/grok"]
-        case .codex, .openCode, .cursor: return []
+        case .codex, .openCode, .cursor, .antigravity: return []
         }
     }
 
@@ -58,6 +62,7 @@ enum InstalledAIKind: String, CaseIterable, Codable, Identifiable, Sendable {
         case .grok: return .grok
         case .openCode: return .openCode
         case .cursor: return .cursor
+        case .antigravity: return .antigravity
         }
     }
 
@@ -65,6 +70,7 @@ enum InstalledAIKind: String, CaseIterable, Codable, Identifiable, Sendable {
     func isolationCaveat(hasManagedMCPPolicy: Bool) -> String? {
         switch self {
         case .cursor: return "Ask mode · your Cursor MCP servers still apply"
+        case .antigravity: return "Antigravity keeps its own conversation history"
         case .claude:
             return hasManagedMCPPolicy
                 ? "MCP on this route is managed by your organization" : nil
@@ -79,6 +85,7 @@ enum InstalledAIKind: String, CaseIterable, Codable, Identifiable, Sendable {
         case .grok: return "grok login"
         case .openCode: return "opencode auth login"
         case .cursor: return "agent login"
+        case .antigravity: return "agy"
         }
     }
 }
@@ -92,6 +99,7 @@ extension AIModelSource {
         case .grok: return .grok
         case .openCode: return .openCode
         case .cursor: return .cursor
+        case .antigravity: return .antigravity
         case .appleIntelligence, .api: return nil
         }
     }
@@ -264,6 +272,35 @@ struct InstalledAIModel: Equatable, Identifiable, Sendable {
         return models
     }
 
+    static func antigravityCatalog(_ output: String) -> [InstalledAIModel] {
+        var order: [String] = []
+        var names: [String: String] = [:]
+        var efforts: [String: Set<String>] = [:]
+        for line in output.split(whereSeparator: \.isNewline) {
+            let fields = line.split(maxSplits: 1, whereSeparator: \.isWhitespace)
+            guard fields.count == 2 else { continue }
+            let slug = String(fields[0])
+            guard slug.contains("-") else { continue }
+            let family = AntigravityLaunch.modelFamily(slug)
+            if names[family] == nil {
+                order.append(family)
+                names[family] = fields[1].replacingOccurrences(
+                    of: #"\s*\((Low|Medium|High|Extra High|Max)\)$"#,
+                    with: "", options: .regularExpression)
+            }
+            if let effort = AntigravityLaunch.modelEffort(slug) {
+                efforts[family, default: []].insert(effort)
+            }
+        }
+        return order.map { family in
+            InstalledAIModel(
+                id: family, name: names[family] ?? family,
+                efforts: (efforts[family] ?? []).sorted(by: effortOrder).map {
+                    ChatGPTSubscription.Effort(id: $0, detail: nil)
+                })
+        }
+    }
+
     private static func effortOrder(_ lhs: String, _ rhs: String) -> Bool {
         let order = ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
         let left = order.firstIndex(of: lhs) ?? order.endIndex
@@ -288,4 +325,65 @@ struct InstalledAIStatus: Equatable, Sendable {
     var models: [InstalledAIModel] = []
 
     var isReady: Bool { phase == .ready && executable != nil && !models.isEmpty }
+}
+
+enum AntigravityLaunch {
+    private static let effortIDs = ["low", "medium", "high", "xhigh", "max"]
+
+    static func modelEffort(_ slug: String) -> String? {
+        effortIDs.first { slug.hasSuffix("-" + $0) }
+    }
+
+    static func modelFamily(_ slug: String) -> String {
+        guard let effort = modelEffort(slug) else { return slug }
+        return String(slug.dropLast(effort.count + 1))
+    }
+
+    static func agentDefinition(name: String, webSearch: Bool = false) -> String {
+        let tools = webSearch ? "finish, search_web, read_url_content" : "finish"
+        let instructions =
+            webSearch
+            ? "You may search the web and read web pages. Cite sources as Markdown links."
+            : "Do not access the web or external resources."
+        return """
+            ---
+            name: \(name)
+            description: Text responses inside Oz.
+            mainAgent: true
+            subagent: false
+            tools: [\(tools)]
+            mcpServers: []
+            skills: []
+            plugins: []
+            commandExecutionPolicy: off
+            ---
+            You are an assistant inside Oz. Follow the provided conversation and instructions.
+            Native file, shell, browser, subagent and MCP tools are unavailable.
+            \(instructions)
+            When Oz supplies tools, request them using its structured response instead of native tools.
+            """
+    }
+
+    static func userMessage(_ prompt: String) throws -> Data {
+        let object: [String: Any] = ["event": "user", "message": ["content": prompt]]
+        var data = try JSONSerialization.data(withJSONObject: object)
+        data.append(0x0A)
+        return data
+    }
+}
+
+enum AntigravitySubscriptionTier: String, CaseIterable, Sendable {
+    case unspecified
+    case free
+    case pro
+    case ultra
+
+    var title: String {
+        switch self {
+        case .unspecified: return "Not specified"
+        case .free: return "Free"
+        case .pro: return "Google AI Pro"
+        case .ultra: return "Google AI Ultra"
+        }
+    }
 }

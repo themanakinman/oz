@@ -96,6 +96,8 @@ enum SettingsBackupCoverage {
         AppSettingsKey.aiEnabled.rawValue:
             "No other AI setting travels in a backup, so an import would arm a feature it cannot "
             + "configure.",
+        AppSettingsKey.aiAntigravityPlan.rawValue:
+            "The account label belongs to the Google account signed in on this Mac.",
         AppSettingsKey.aiInstalledProviders.rawValue:
             "Installed commands and their accounts belong to this Mac; an import must not enable "
             + "their discovery on another one.",

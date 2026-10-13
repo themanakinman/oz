@@ -36,7 +36,7 @@ enum InstalledAIProbe {
     nonisolated static func run(
         executable: URL, arguments: [String], workspace: URL,
         environment: [String: String]? = nil, input: Data? = nil,
-        timeout: Duration = .seconds(10)
+        timeout: Duration = .seconds(10), includesStandardError: Bool = false
     ) async -> Result {
         let handle = ProcessHandle()
         return await withTaskCancellationHandler(
@@ -54,7 +54,7 @@ enum InstalledAIProbe {
                     let stdin = input.map { _ in Pipe() }
                     process.standardInput = stdin ?? FileHandle.nullDevice
                     process.standardOutput = output
-                    process.standardError = FileHandle.nullDevice
+                    process.standardError = includesStandardError ? output : FileHandle.nullDevice
                     do { try process.run() } catch { return Result(status: -1, output: "") }
                     handle.set(process)
                     if let stdin, let input { Self.write(input, to: stdin, closing: true) }

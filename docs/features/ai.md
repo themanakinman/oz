@@ -16,7 +16,7 @@ top beside the model picker, with Send and Actions floating below. ⌘J hands a 
 Both existing surfaces offer **Files** by default for Codex, Claude, and API models with tool calling.
 There is no folder picker or project setup. The model receives the user's home path and can discover
 directories anywhere on the filesystem, subject to macOS access permissions. Apple Intelligence,
-Grok, OpenCode and Cursor remain text routes. The selected model receives the content of files it reads.
+Grok, OpenCode, Cursor and Antigravity remain text routes. The selected model receives the content of files it reads.
 
 `AIFileTools` defines directory listing, name and text search, paged UTF-8 reads, file creation and
 replacement, exact text edits, directory creation, moves, Trash, version listing and restoration.
@@ -92,7 +92,7 @@ the current tool turn; saved history carries the ordinary activity and result st
   `ai-chats.sqlite3` nor a Keychain key. `aiEnabled` is excluded from settings backups like every
   other AI key, so an import can never arm a feature it cannot configure.
 - **Installed model discovery is per-provider.** Settings → AI → Providers keeps Codex, Claude, Grok,
-  OpenCode and Cursor visible with an individual toggle for each, all off by default. Turning one off cancels
+  OpenCode, Cursor and Antigravity visible with an individual toggle for each, all off by default. Turning one off cancels
   its check, clears its catalog and releases its process; Apple Intelligence is the default route when
   available, and saved API connections stay available.
 - **Every request carries Oz's own preamble, and the user's text goes after it.**
@@ -121,7 +121,7 @@ the current tool turn; saved history carries the ordinary activity and result st
   and Claude routes as a bearer header, so a hosted server is signed into once for every route.
   See [MCP](mcp.md).
 - **The chat model is the routing decision.** It names the on-device model, a model exposed by the
-  installed Codex, Claude, Grok, OpenCode or Cursor command, or one saved API connection and model. Installed
+  installed Codex, Claude, Grok, OpenCode, Cursor or Antigravity command, or one saved API connection and model. Installed
   routes also carry their reasoning effort when the selected model supports one. A removed route
   falls forward to the on-device model when this Mac
   has one, then to another usable API model, then to no selection. Discovering an installed command
@@ -191,8 +191,8 @@ the current tool turn; saved history carries the ordinary activity and result st
   why, because silently moving someone from a free, private, local model onto a billed endpoint is
   the one redirection this feature must never perform.
 - **Installed commands reuse their own login.** Oz launches the user's `codex`, `claude`, `grok` or
-  `opencode` executable without asking for or storing another key. Codex inherits the user's normal
-  home and credential-store setting; Claude, Grok, OpenCode and Cursor inherit their normal configuration. Oz
+  `opencode`, `agent` or `agy` executable without asking for or storing another key. Codex inherits the user's normal
+  home and credential-store setting; Claude, Grok, OpenCode, Cursor and Antigravity inherit their normal configuration. Oz
   does not read credential files for provider authentication or use undocumented web endpoints.
   Files tools can read OS-accessible files when requested by the model.
 - **Codex runs Oz's MCP servers and nothing else.** The app-server still launches with every
@@ -254,6 +254,33 @@ the current tool turn; saved history carries the ordinary activity and result st
   its display to `omitted` unless one is named explicitly, and the `showThinkingSummaries` setting
   is read only by an interactive session. Without it Sonnet and Opus stream every thinking block
   empty, so the fold would show one opening line.
+- **Antigravity reuses the installed `agy` login and its current model catalog.** Enable it under
+  Settings → AI → Providers, run `agy` in Terminal to sign in if needed, then Check Again. `agy models`
+  discovers the account's slugs and names without generating a response. Oz groups effort variants
+  into model families and offers the reported levels in the same effort picker as Codex. Launch uses
+  the family ID and a separate `--effort`; combining a variant slug with a different effort fails.
+  Quick AI, AI Chat and Quick Actions share this route; saved conversations retain their chosen effort.
+  Discovery never runs while its provider toggle is off. The subscription picker records the reader's
+  declared Free, Google AI Pro or Google AI Ultra plan and shows it in the Providers row. It defaults
+  to Not specified: the headless CLI does not expose automatic plan discovery. This account label is
+  local to this Mac and excluded from settings backups.
+  Each request uses a separate private workspace with an Oz custom primary agent. Its explicit tool
+  list contains `finish` plus `search_web` and `read_url_content` only when web search is enabled.
+  Native file, shell, browser, subagent and MCP tools remain withheld; no permission bypass is passed.
+  Files and scoped MCP tools use Oz's `AIToolLoopProvider`, including its consent, revisions, round
+  limits, result budgets and cancellation. `AntigravityToolProtocol` supplies offered tool schemas
+  and conversation history with call IDs and results. `--json-schema` constrains the final response
+  to text and calls; Oz validates the tool name and argument object before emitting any call. Raw
+  structured JSON deltas are withheld from the transcript; the final structured text is shown instead.
+  Without offered tools, Oz streams `agent_response.text_delta` and uses the final text only if no
+  delta arrived. A terminal `SUCCESS` completes a round and supplies usage. Native web tool steps
+  produce search activity rows. Images remain unavailable; PDF attachments use local text/OCR extraction.
+  Every CLI round gets its own runner and workspace so cleanup cannot cancel the next tool round.
+  Oz deletes its temporary workspace after exit, but Antigravity retains its own conversation data
+  under its normal configuration; the Providers row states that caveat. Oz never changes the user's
+  Antigravity settings or reads its credentials. Auto-update is disabled for its subprocesses.
+  The CLI's [headless protocol](https://antigravity.google/docs/cli/headless/) and
+  [custom agent schema](https://antigravity.google/docs/subagents/) define this transport.
 - **A conversation is live in one place at a time.** `AIChatSurfacesState` holds Quick AI's
   `AIChatState`, the window's, and any window chat left mid-reply. Opening a chat anywhere takes the
   live state from wherever it already is — ⌘J moves Quick AI's whole state object, reply, staged
@@ -341,6 +368,7 @@ as `.codex`, so an existing selection survives the rename.
 | Grok | installed `grok --prompt-file` | user's Grok login |
 | OpenCode | installed `opencode run` | providers already configured in OpenCode |
 | Cursor | installed `agent -p --mode ask` | user's Cursor login |
+| Antigravity | installed `agy` headless CLI | user's Google account |
 | OpenAI API | OpenAI Chat Completions | `https://api.openai.com/v1` |
 | Anthropic Claude | Anthropic Messages | `https://api.anthropic.com` |
 | Google Gemini | Gemini's OpenAI-compatible API | `https://generativelanguage.googleapis.com/v1beta/openai` |
@@ -657,7 +685,9 @@ login shell, so a stale copy in another prefix never shadows the one Terminal ru
 names no absolute executable does it fall back to the app's PATH, the normal Homebrew and local-bin
 locations and every nvm Node version, newest first — a fallback that can pick a different copy. The
 commands are never installed by Oz; Settings links to their own install docs and offers a sign-in
-command to copy. `InstalledAIManager` probes Claude, Grok, OpenCode and Cursor off-main, in parallel.
+command to copy. Codex's MCP listing and app-server use the same launch environment, with the
+located executable's directory on PATH so npm installs can find their Node runtime from Finder.
+`InstalledAIManager` probes Claude, Grok, OpenCode and Cursor off-main, in parallel.
 Claude's auth status gates an `initialize` control request, and `InstalledAIModel.claudeCatalog` builds
 its model list from the answer; a successful Grok or OpenCode model list is both its auth check and
 catalog; Cursor's `status --format json` gates `--list-models`.
@@ -689,7 +719,7 @@ reasoning effort belongs to `turn/start`; neither is written to the user's Codex
 developer instructions say whether the model may reach the web so the two cannot disagree. Images go
 out as `image` input parts with data URLs, and as `input_image` when prior turns are injected.
 
-`InstalledCLITurnRunner` handles Claude, Grok, OpenCode and Cursor behind the same provider protocol. It
+`InstalledCLITurnRunner` handles Claude, Grok, OpenCode, Cursor and Antigravity behind the same provider protocol. It
 frames Oz's instructions and bounded conversation history as stdin (or a private `--prompt-file` for
 Grok, whose CLI requires a path), consumes newline-delimited JSON, and never puts prompt text on the
 process command line. Claude uses stream JSON, `--effort` and no session persistence, and takes every
@@ -705,7 +735,7 @@ model variant through `--variant`; it captures the returned session identifier, 
 the local chat under `~/.cursor/chats/<workspace>/<session_id>` because the CLI has no delete-chat.
 A turn finishes on its own completion frame; both cleanups run detached after the child exits, so
 housekeeping never holds the composer shut.
-Cancellation terminates the child process; only one installed-CLI turn can own a runner at a time.
+Cancellation terminates the child process; each installed-CLI round gets a separate runner.
 
 ## Web search and attachments
 
@@ -724,6 +754,7 @@ transport code at all.
 | Grok command | never | never | extracted text | the global config still loads — `--deny *` refuses the call |
 | OpenCode command | never | never | extracted text | the global config still loads — `permission: deny` refuses the call |
 | Cursor command | never | never | extracted text | the global config still loads — ask mode and withheld approval refuse the call |
+| Antigravity command | per-turn search/URL tool allowlist | never | extracted text | Oz tool loop with structured calls and results; native MCP withheld |
 | OpenRouter | `plugins: [{id: "web"}]` — OpenRouter's own layer, any model | `image_url` part, only for models whose catalog lists the `image` modality | extracted text — native file delivery is not implemented | `tools` + `role: "tool"` turns |
 | OpenAI | not offered | `image_url` part, assumed supported | `file` part with `filename` and a `file_data` data URL | `tools` + `role: "tool"` turns |
 | Gemini / compatible | not offered | `image_url` part, assumed supported | extracted text | `tools` + `role: "tool"` turns |

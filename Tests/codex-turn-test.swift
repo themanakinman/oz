@@ -21,6 +21,7 @@ struct CodexTurnTests {
             await appEnvironmentFindsCodexRuntime()
             await modelDiscoveryFailureKeepsReasoningOptions()
             await skillInstructionsAndEffortReachCodex()
+            await aNodeInstallStartsWithFindersPath()
             print("\(passes) passed, \(failures) failed")
             if failures > 0 { exit(1) }
             return
@@ -28,6 +29,7 @@ struct CodexTurnTests {
         await appEnvironmentFindsCodexRuntime()
         await modelDiscoveryFailureKeepsReasoningOptions()
         await skillInstructionsAndEffortReachCodex()
+        await aNodeInstallStartsWithFindersPath()
         await stopBeforeTurnStartedStillInterrupts()
         await aTurnNamedTwiceIsInterruptedOnce()
         await ozsServersAreLaunchedAndTheUsersOwnAreNot()
@@ -131,6 +133,31 @@ struct CodexTurnTests {
                 "the chosen reasoning effort reaches the Codex turn")
         } catch {
             expect(false, "the selected skill request composes")
+        }
+    }
+
+    static func aNodeInstallStartsWithFindersPath() async {
+        let inherited = ProcessInfo.processInfo.environment["PATH"] ?? ""
+        guard let node = await ExecutableLocator.locate("node"),
+            let server = StubServer(mode: "mcp")
+        else {
+            expect(false, "the Node-backed stub installs")
+            return
+        }
+        defer {
+            setenv("PATH", inherited, 1)
+            server.tearDown()
+        }
+        let bin = server.root.appending(path: "bin")
+        do {
+            try FileManager.default.createSymbolicLink(at: bin.appending(path: "node"),
+                withDestinationURL: node)
+            setenv("PATH", "/usr/bin:/bin:/usr/sbin:/sbin", 1)
+            try await server.client.start()
+            expect(server.client.isRunning && !server.listArgv.isEmpty,
+                "the MCP list and app-server both find Node beside the located Codex executable")
+        } catch {
+            expect(false, "a Node-backed Codex starts with Finder's PATH: \(error.localizedDescription)")
         }
     }
 

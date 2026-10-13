@@ -47,6 +47,11 @@ enum AIProviderFactory {
                 throw AIProviderError.unavailable("Cursor is disabled in AI Settings.")
             }
             return try installedAI.provider(kind: .cursor, model: model, effort: effort)
+        case .antigravity(let model, let effort):
+            guard settings.enabledInstalledProviders.contains(.antigravity) else {
+                throw AIProviderError.unavailable("Antigravity is disabled in AI Settings.")
+            }
+            return try installedAI.provider(kind: .antigravity, model: model, effort: effort)
         case .api(let connectionID, let model, let effort):
             guard let connection = settings.connection(id: connectionID) else {
                 throw AIProviderError.unavailable("Choose an API connection in Settings.")

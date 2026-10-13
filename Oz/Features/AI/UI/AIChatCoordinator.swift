@@ -454,6 +454,7 @@ final class AIChatCoordinator {
         case .appleIntelligence?: return .appleIntelligence
         case .codex?: return .codex
         case .claude?: return .claudeCommand
+        case .antigravity?: return .antigravityCommand
         case .grok?, .openCode?, .cursor?:
             return AIModelCapabilities(
                 images: false, documents: false, webSearch: false, tools: false)
@@ -625,7 +626,7 @@ final class AIChatCoordinator {
         core.aiSettings.enabledInstalledProviders.contains { kind in
             switch kind {
             case .codex: core.chatGPTSubscription.phase == .starting
-            case .claude, .grok, .openCode, .cursor:
+            case .claude, .grok, .openCode, .cursor, .antigravity:
                 core.installedAI.status(for: kind).phase == .checking
             }
         }
@@ -639,8 +640,8 @@ final class AIChatCoordinator {
 
     /// The chat's own model while it is still reachable; otherwise the default a new chat takes.
     func model(for chat: AIChatState) -> AIModelSelection? {
-        if let own = chat.session.model, isReachable(own) { return own }
-        return core.aiSettings.defaultModel
+        if let own = chat.session.model, isReachable(own) { return AIModelOption.canonical(own) }
+        return core.aiSettings.defaultModel.map(AIModelOption.canonical)
     }
 
     /// A route removed in Settings falls back to the default rather than failing the chat.
@@ -650,7 +651,7 @@ final class AIChatCoordinator {
             return true
         case .api(let connection, let model, _):
             return core.aiSettings.connection(id: connection)?.models.contains(model) == true
-        case .codex, .claude, .grok, .openCode, .cursor:
+        case .codex, .claude, .grok, .openCode, .cursor, .antigravity:
             return selection.source.installedKind.map {
                 core.aiSettings.enabledInstalledProviders.contains($0)
             } ?? false
@@ -701,6 +702,7 @@ final class AIChatCoordinator {
         case .claude?: return .asset(AIBrand.claude.assetName)
         case .grok?: return .asset(AIBrand.x.assetName)
         case .cursor?: return AIModelOption.cursorIcon
+        case .antigravity(let model, _)?: return AIModelOption.icon(AIBrand.resolve(model: model))
         case .openCode(let model, _)?: return AIModelOption.icon(AIBrand.resolve(model: model))
         case .api(let connection, let model, _)?:
             return AIModelOption.icon(

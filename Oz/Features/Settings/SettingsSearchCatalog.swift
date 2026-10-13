@@ -272,6 +272,7 @@ enum SettingsSearchCatalog {
             .aiProviders, "Providers",
             keywords: [
                 "sign in", "connect", "codex", "claude", "grok", "xai", "opencode", "cursor", "agent",
+                "antigravity", "agy", "google ai pro", "google ai ultra", "subscription", "tier",
                 "api key", "connection", "base url", "openai", "anthropic", "ollama"
             ]),
         .init(.aiDefault, "Default model", keywords: ["llm", "gpt", "claude", "grok"]),
