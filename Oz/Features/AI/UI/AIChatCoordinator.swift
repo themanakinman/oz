@@ -766,7 +766,7 @@ final class AIChatCoordinator {
         switch model(for: chat)?.source {
         case .codex:
             if core.aiSettings.enabledInstalledProviders.contains(.codex) { core.chatGPTSubscription.refresh() }
-        case .claude, .grok, .openCode, .cursor:
+        case .claude, .grok, .openCode, .cursor, .antigravity:
             if let kind = model(for: chat)?.source.installedKind { core.installedAI.refresh(kind: kind) }
         case .api, .appleIntelligence, nil:
             prepareModelSwitcher()
