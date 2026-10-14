@@ -36,6 +36,25 @@ enum FileSearchScope {
         return Selection(directories: directories, rootItems: rootItems)
     }
 
+    static func spotlightScopes(for directories: [URL], homeDirectory: URL) -> [[URL]] {
+        let cloudRoots = [
+            homeDirectory.appending(path: "Library/CloudStorage").standardizedFileURL.path,
+            homeDirectory.appending(path: "Library/Mobile Documents/com~apple~CloudDocs")
+                .standardizedFileURL.path
+        ]
+        var local: [URL] = []
+        var cloud: [[URL]] = []
+        for directory in directories {
+            let path = directory.standardizedFileURL.path
+            if cloudRoots.contains(where: { path == $0 || path.hasPrefix($0 + "/") }) {
+                cloud.append([directory])
+            } else {
+                local.append(directory)
+            }
+        }
+        return (local.isEmpty ? [] : [local]) + cloud
+    }
+
     static func expand(_ scope: String, homeDirectory: URL) -> URL {
         guard scope.hasPrefix("~") else {
             return URL(fileURLWithPath: scope, isDirectory: true).standardizedFileURL
