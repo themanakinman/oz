@@ -28,7 +28,7 @@ enabled in Settings.
   the feature permission-free, so no user setting can re-admit them. Everything else that is dropped
   comes from the ignore list.
 - **`~/Library` is never a scope Oz picks by itself.** A configured home root expands into its
-  visible children plus the two cloud-storage roots instead. A user who adds a folder under `~/Library`
+  visible children plus the cloud-drive scopes instead. A user who adds a folder under `~/Library`
   by hand gets what they asked for.
 - **The shipped ignore rules are compiled in and never persisted.** `fileSearchIgnorePatterns` stores
   only what the user added, so changing `FileSearchIgnoreList.defaults` reaches installs that already
@@ -57,10 +57,12 @@ and renders the full result list. One worker serializes synchronous Spotlight ca
 to the newest pending query, so slower typing cannot accumulate overlapping queries. The session owns
 *when* a search runs and nothing else — the expressions are the service's, built where the policy that
 shapes them already is. The service resolves the configured roots,
-then keeps every `MDQuery` reference inside one nonisolated synchronous function. Spotlight returns at
-most 1,000 candidates. `FileSearchQuery` removes hidden path components and app-bundle contents, applies
-the ignore list, then applies `FuzzyMatch` and publishes at most 200. Localized filename then path order
-makes ties deterministic.
+then keeps every `MDQuery` reference inside one nonisolated synchronous function. Local folders share
+one Spotlight query; each cloud drive gets its own query so a busy local or Google Drive index cannot
+consume iCloud Drive's candidate budget. Every query returns at most 1,000 candidates.
+`FileSearchQuery` removes hidden path components and app-bundle contents, applies the ignore list, then
+applies `FuzzyMatch`. Results are merged and trimmed to the best 200 after each query. Localized filename
+then path order makes ties deterministic.
 
 **`kMDItemPath` is the only attribute read from a result.** `MDQuery` hands the path back from its own
 cache; every other attribute is a metadata fetch costing about half a millisecond, which over a thousand
@@ -80,8 +82,8 @@ window: changed in the last 3 days, used in the last 30. Both are needed because
 `kMDItemLastUsedDate` for very few opens now — a used-only list is a handful of downloads — and the
 shorter change window is what keeps a busy machine's matches under the candidate cap.
 
-Spotlight sorts on one attribute, so the service runs **one sorted query per stamp** and merges their heads
-by date, newest first, before publishing 20. Only the first 20 rows of each list are dated: no row past
+Spotlight sorts on one attribute, so the service runs **one sorted query per stamp and scope group**
+and merges their heads by date, newest first, before publishing 20. Only the first 20 rows of each list are dated: no row past
 that can reach the merged list, and every date read costs a metadata fetch. The sort attribute has to be
 named in `MDQueryCreate`; set afterwards through `MDQuerySetSortOrder` it is ignored, which is what the
 first attempt at this measured.
@@ -108,9 +110,11 @@ the ignore list. It is rebuilt when either setting changes, never per keystroke,
 tilde expansion stay off the typing path.
 
 Scopes are stored tilde-abbreviated in `fileSearchScopes` so a backup taken on one machine still points
-somewhere on another. Home expands into its visible children plus `Library/CloudStorage` and the current
-iCloud Drive root; every other root is handed to `MDQuerySetSearchScope` as it stands. An empty list
-searches nothing rather than falling back to home — a cleared list is a deliberate choice, not an unset one.
+somewhere on another. Home expands into its visible children, each provider folder inside
+`Library/CloudStorage` (including Google Drive), and the current iCloud Drive root. Cloud scopes are queried separately from local
+folders, including when configured explicitly. Every other root is handed to
+`MDQuerySetSearchScope` as it stands. An empty list searches nothing rather than falling back to home —
+a cleared list is a deliberate choice, not an unset one.
 
 `FileSearchIgnoreList` compiles each pattern once into one of three buckets, which is what keeps matching
 cheap enough to run against every candidate:

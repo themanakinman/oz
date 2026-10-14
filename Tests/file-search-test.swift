@@ -22,6 +22,7 @@ struct FileSearchTests {
         recents()
         typeFilter()
         scopePolicy()
+        cloudScopes()
         pathPolicy()
         ignoreRules()
         policyResolution()
@@ -151,6 +152,27 @@ struct FileSearchTests {
             selection.rootItems.map(\.url.lastPathComponent)
                 == ["Documents", "Developer", "Project.xcodeproj", "Notes.txt"],
             "visible root folders, files and document packages remain direct candidates")
+    }
+
+    static func cloudScopes() {
+        let local = home.appending(path: "Documents")
+        let provider = home.appending(path: "Library/CloudStorage/GoogleDrive-test")
+        let icloud = home.appending(path: "Library/Mobile Documents/com~apple~CloudDocs")
+        let groups = FileSearchScope.spotlightScopes(
+            for: [local, provider, icloud], homeDirectory: home)
+        expect(groups == [[local], [provider], [icloud]],
+            "cloud drives receive their own candidate caps instead of competing with local folders")
+        expect(FileSearchScope.spotlightScopes(for: [], homeDirectory: home).isEmpty,
+            "empty scopes issue no queries")
+        expect(FileSearchScope.spotlightScopes(
+            for: [provider], homeDirectory: home) == [[provider]],
+            "an explicitly configured cloud folder searches without a local group")
+        let secondLocal = home.appending(path: "Desktop")
+        let similar = home.appending(path: "Library/CloudStorage-backup")
+        expect(FileSearchScope.spotlightScopes(
+            for: [local, secondLocal, similar], homeDirectory: home)
+                == [[local, secondLocal, similar]],
+            "local folders share a query and cloud prefixes respect path boundaries")
     }
 
     static func pathPolicy() {

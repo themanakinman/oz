@@ -14,34 +14,39 @@ enum FileSearchService {
     ) throws -> [FileSearchResult] {
         try Signposts.interval("FileSearchService.search") {
             let selection = resolveScopes(policy)
+            let scopes = FileSearchScope.spotlightScopes(
+                for: selection.directories, homeDirectory: policy.homeDirectory)
             guard !rawQuery.isEmpty else {
-                return try recent(scopes: selection.directories, policy: policy, filter: filter)
+                return try recent(scopes: scopes, policy: policy, filter: filter)
             }
             var results = rootResults(selection, query: rawQuery, policy: policy, filter: filter)
             guard
-                !selection.directories.isEmpty,
+                !scopes.isEmpty,
                 let expression = FileSearchQuery.expression(
                     for: rawQuery, excluding: policy.ignore.spotlightNameExclusions, filter: filter)
             else { return FileSearchQuery.rank(results, for: rawQuery, ignoring: policy.ignore) }
 
             var seen = Set(results.map(\.id))
-            // Excluded before the stat: an ignored tree then costs a string test, not a file read.
-            for path in try spotlightPaths(expression: expression, scopes: selection.directories)
-            where !FileSearchQuery.isExcludedPath(path, ignoring: policy.ignore)
-                && seen.insert(path).inserted
-            {
-                guard let result = resolve(path, homeDirectory: policy.homeDirectory) else {
-                    continue
+            for group in scopes {
+                // Excluded before the stat: an ignored tree then costs a string test, not a file read.
+                for path in try spotlightPaths(expression: expression, scopes: group)
+                where !FileSearchQuery.isExcludedPath(path, ignoring: policy.ignore)
+                    && seen.insert(path).inserted
+                {
+                    guard let result = resolve(path, homeDirectory: policy.homeDirectory) else {
+                        continue
+                    }
+                    results.append(result)
                 }
-                results.append(result)
+                results = FileSearchQuery.rank(results, for: rawQuery, ignoring: policy.ignore)
             }
-            return FileSearchQuery.rank(results, for: rawQuery, ignoring: policy.ignore)
+            return results
         }
     }
 
     /// Two sorted queries merged by date: Spotlight sorts on one attribute, and both stamps matter.
     private nonisolated static func recent(
-        scopes: [URL], policy: FileSearchPolicy, filter: FileSearchFilter
+        scopes: [[URL]], policy: FileSearchPolicy, filter: FileSearchFilter
     ) throws -> [FileSearchResult] {
         guard !scopes.isEmpty else { return [] }
         let exclusions = policy.ignore.spotlightNameExclusions
@@ -50,12 +55,14 @@ enum FileSearchService {
         for stamp in FileSearchQuery.RecentStamp.allCases {
             let expression = FileSearchQuery.recentExpression(
                 stamp: stamp, excluding: exclusions, filter: filter)
-            // Only the head of a sorted list can reach the merged one, so only it is worth dating.
-            for (path, date) in try spotlightPaths(
-                expression: expression, scopes: scopes,
-                sortedBy: stamp.rawValue as CFString, dating: limit)
-            where !FileSearchQuery.isExcludedPath(path, ignoring: policy.ignore) {
-                dated[path] = max(dated[path] ?? .distantPast, date)
+            for group in scopes {
+                // Only the head of a sorted list can reach the merged one, so only it is worth dating.
+                for (path, date) in try spotlightPaths(
+                    expression: expression, scopes: group,
+                    sortedBy: stamp.rawValue as CFString, dating: limit)
+                where !FileSearchQuery.isExcludedPath(path, ignoring: policy.ignore) {
+                    dated[path] = max(dated[path] ?? .distantPast, date)
+                }
             }
         }
         return dated.sorted { $0.value > $1.value }
@@ -183,14 +190,16 @@ enum FileSearchService {
     }
 
     private nonisolated static func cloudScopes(homeDirectory: URL) -> [URL] {
-        let candidates = [
-            homeDirectory.appending(path: "Library/CloudStorage", directoryHint: .isDirectory),
-            homeDirectory.appending(
-                path: "Library/Mobile Documents/com~apple~CloudDocs", directoryHint: .isDirectory)
-        ]
-        return candidates.filter { url in
+        let storage = homeDirectory.appending(
+            path: "Library/CloudStorage", directoryHint: .isDirectory)
+        let providers = (try? FileManager.default.contentsOfDirectory(
+            at: storage, includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles])) ?? []
+        let icloud = homeDirectory.appending(
+            path: "Library/Mobile Documents/com~apple~CloudDocs", directoryHint: .isDirectory)
+        return (providers + [icloud]).filter { url in
             (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
-        }
+        }.sorted { $0.path < $1.path }
     }
 
     private nonisolated static func deduplicated(_ urls: [URL]) -> [URL] {
