@@ -1,7 +1,11 @@
-// The `require` an extension bundle sees. Bundles are single-file CJS with `react`,
-// `react/jsx-runtime`, `@raycast/api` and the Node builtins left external — exactly the set below.
+// The `require` an extension bundle sees. Bundles leave the host modules and selected store
+// dependencies external; those dependencies are bundled into Oz's runtime instead.
 
 import { nodeModules } from "./node-shims.js";
+import Color from "colorjs.io";
+import colorNamer from "color-namer";
+import uniqBy from "lodash/uniqBy.js";
+import { environment, launchCommand } from "./api/system.js";
 
 const registry = new Map();
 
@@ -10,6 +14,34 @@ export function defineModule(name, exports) {
 }
 
 for (const name of Object.keys(nodeModules)) defineModule(name, nodeModules[name]);
+
+defineModule("colorjs.io", Color);
+defineModule("color-namer", colorNamer);
+defineModule("lodash/uniqBy", uniqBy);
+defineModule("raycast-cross-extension", {
+  callbackLaunchCommand(options, result) {
+    return launchCommand({
+      ...options,
+      context: { ...options.context, ...result },
+    });
+  },
+  crossLaunchCommand(options, callbackLaunchOptions) {
+    if (callbackLaunchOptions === false) return launchCommand(options);
+    return launchCommand({
+      ...options,
+      context: {
+        ...options.context,
+        callbackLaunchOptions: {
+          name: environment.commandName,
+          extensionName: environment.extensionName,
+          ownerOrAuthorName: environment.ownerOrAuthorName,
+          type: "userInitiated",
+          ...callbackLaunchOptions,
+        },
+      },
+    });
+  },
+});
 
 export function requireModule(name) {
   const key = String(name);

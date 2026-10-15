@@ -85,13 +85,14 @@ timers, `fetch`, `URL`, `URLSearchParams`, `Blob`/`File`/`FormData`, `DOMExcepti
 
 ## The JS runtime
 
-`Oz/Resources/RaycastRuntime.generated.js` (~200 KB minified) is **generated and committed**, the
+`Oz/Resources/RaycastRuntime.generated.js` (~448 KB minified) is **generated and committed**, the
 same arrangement as `EmojiData.generated.swift`: building Oz never needs Node. Sources live in
 [`Scripts/raycast-runtime/`](../../Scripts/raycast-runtime):
 
 | File | What it is |
 | --- | --- |
 | `src/index.js` | the `__oz` object Swift calls into (`boot`, `start`, `dispatch`, `popNavigation`, `settle`, `fireTimer`, `stop`) |
+| `src/modules.js` | external module resolution for host modules and the third-party packages Oz ships |
 | `src/host.js` | the JS→Swift seam: async `hostCall`, blocking `hostCallSync`, logging |
 | `src/reconciler.js` | `react-reconciler` host config that commits into a JSON tree |
 | `src/api/components.js` | every `@raycast/api` component |
@@ -626,6 +627,10 @@ interval floor instead of sixty.
 `getSelectedText`, `getSelectedFinderItems`, `launchCommand`, `updateCommandMetadata`,
 `openExtensionPreferences`,
 `useNavigation`, `OAuth`, `Icon`, `Color`, `Image.Mask`, `Keyboard.Shortcut.Common`, `LaunchType`.
+
+**External JavaScript packages** — the runtime also provides `colorjs.io`, `color-namer`,
+`lodash/uniqBy`, and `raycast-cross-extension` for published bundles that leave them external.
+The cross-extension helper forwards callback launches through Oz's `launchCommand` bridge.
 
 **OAuth 2.0 PKCE** — `OAuth.PKCEClient`, `OAuth.TokenSet`, `OAuth.RedirectMethod`, with S256 challenges and
 tokens in the login Keychain (service `com.oz.extensions.oauth`, `kSecAttrAccessibleWhenUnlocked`),
