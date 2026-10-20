@@ -11,13 +11,26 @@ struct AIScreen: PaletteScreen {
     let openAttachments: () -> Void
 
     struct Row: Identifiable {
-        let id = "ai-chat"
+        let id: Int
     }
 
-    let rows = [Row()]
+    private var skillMenu: PopoverMenuContent? { coordinator.skillMenu(for: vm.query) }
+    var rows: [Row] { (0..<(skillMenu?.items.count ?? 1)).map { Row(id: $0) } }
 
-    /// One footer pill for Return's two jobs: Send, or Stop while a response streams.
-    var primaryActionTitle: String { chat.isStreaming ? "Stop" : "Send" }
+    var primaryActionTitle: String { skillMenu != nil ? "Choose" : chat.isStreaming ? "Stop" : "Send" }
+
+    func hasPrimaryAction(at selection: Int) -> Bool {
+        guard let menu = skillMenu else { return true }
+        return menu.items.indices.contains(selection) && menu.items[selection].isSelectable
+    }
+
+    func move(_ delta: Int, axis: PaletteAxis, from selection: Int) -> Int? {
+        guard axis == .vertical, let menu = skillMenu else { return nil }
+        let selectable = menu.items.indices.filter { menu.items[$0].isSelectable }
+        guard !selectable.isEmpty else { return selection }
+        if delta > 0 { return selectable.first { $0 > selection } ?? selectable.last }
+        return selectable.last { $0 < selection } ?? selectable.first
+    }
 
     func actions(at selection: Int) -> PopoverMenuContent? {
         var items: [PopoverMenuItem] = []
@@ -82,7 +95,10 @@ struct AIScreen: PaletteScreen {
 
     /// Return and the pill are the same action; an empty composer sends nothing.
     func activate(at selection: Int) {
-        if chat.isStreaming {
+        if let menu = skillMenu {
+            guard menu.items.indices.contains(selection), menu.items[selection].isSelectable else { return }
+            menu.items[selection].action()
+        } else if chat.isStreaming {
             coordinator.stopResponse()
         } else if coordinator.send(vm.query) {
             vm.query = ""
@@ -144,8 +160,34 @@ struct AIScreen: PaletteScreen {
                 chat: chat,
                 availability: { chatCoordinator.availability(for: chat) },
                 onConfigure: chatCoordinator.showSettings,
-                onAppear: chatCoordinator.prepareForChat,
-                onChoose: { coordinator.send($0) }, onRerun: coordinator.rerun))
+                onAppear: {
+                    chatCoordinator.prepareForChat()
+                    coordinator.prepareSkills()
+                },
+                onChoose: { coordinator.send($0) }, onRerun: coordinator.rerun)
+            .overlay(alignment: .topLeading) {
+                if let menu = skillMenu {
+                    PopoverMenu(
+                        header: menu.header, items: menu.items,
+                        selection: Binding(get: { vm.selection }, set: { vm.selection = $0 }),
+                        width: metrics.size.actionMenuWidth,
+                        onActivate: { activate(at: $0) }, search: nil
+                    )
+                    .padding(metrics.spacing.md)
+                }
+            }
+            .onChange(of: vm.query) { previous, current in
+                if coordinator.isCompletingSkills(current), !coordinator.isCompletingSkills(previous) {
+                    coordinator.prepareSkills()
+                }
+            }
+            .onChange(of: vm.focusToken) {
+                chatCoordinator.prepareForChat()
+                coordinator.prepareSkills()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                coordinator.prepareSkills()
+            })
     }
 }
 

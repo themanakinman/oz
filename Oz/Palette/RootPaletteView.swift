@@ -375,8 +375,11 @@ struct RootPaletteView: View {
             .onChange(of: vm.focusToken) {
                 searchFocused = !screen.hidesSearchField
             }
+            .onChange(of: vm.isComposing) {
+                if !menuOpen { core.quickAICoordinator.openSkillsFromPalette() }
+            }
             .onChange(of: vm.searchCaretResetToken) {
-                (hostWindow as? PalettePanel)?.resetFieldEditorCursorToBeginning()
+                (hostWindow as? PalettePanel)?.resetFieldEditorCursor(toEnd: vm.searchCaretResetsToEnd)
             }
             // A preserved screen re-summons as it was left, so a menu must end with the palette.
             .onChange(of: vm.isVisible) {
@@ -384,6 +387,7 @@ struct RootPaletteView: View {
             }
             .onChange(of: vm.query) {
                 if vm.collapseQueryLineBreaks() { return }
+                if !menuOpen, core.quickAICoordinator.openSkillsFromPalette() { return }
                 vm.selection = 0
                 scroll = ScrollIntent(kind: .top)
                 if vm.mode == .fileSearch {
@@ -604,6 +608,12 @@ struct RootPaletteView: View {
             .onKeyPress(keys: [.tab], phases: .down) { press in
                 // ⇥ inside an open list belongs to the list, not to the form's field order.
                 if vm.isControlListOpen { return .handled }
+                if !menuOpen, vm.mode == .ai, !vm.isComposing,
+                    !press.modifiers.contains(.shift),
+                    core.quickAICoordinator.skillMenu(for: vm.query) != nil {
+                    activateSelection()
+                    return .handled
+                }
                 if !menuOpen { advanceTabFocus(backwards: press.modifiers.contains(.shift)) }
                 return .handled
             }
@@ -730,7 +740,7 @@ struct RootPaletteView: View {
                     icon: core.aiChatCoordinator.selectedModelIcon(for: quickAI),
                     isOpen: openMenu == .aiModel,
                     action: toggleAIModel)
-                if !core.aiChatCoordinator.reasoningEfforts(for: quickAI).isEmpty {
+                if core.aiChatCoordinator.showsReasoningControl(for: quickAI) {
                     headerGutter(width: metrics.spacing.md)
                     AIReasoningButton(
                         title: core.aiChatCoordinator.selectedReasoningTitle(for: quickAI),

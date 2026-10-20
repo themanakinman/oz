@@ -79,6 +79,11 @@ the current tool turn; saved history carries the ordinary activity and result st
 
 ## Invariants
 
+- **Skills use one channel-specific source.** `AppCore` owns `AISkillStore`; all Quick AI model
+  routes draw from `Application Support/<bundle id>/AI/skills.md`. Loading and creating its starter
+  file happen off-main after Quick AI opens. Explicit selection supplies instructions, never
+  tool access. The AI Chat window's skills interface and request integration are deferred.
+
 - **AI is off out of the box, and off means fully off.** `AppSettings.aiEnabled` is the flag:
   no `Quick AI` or `AI Chat` command in the launcher, no history database opened or created, no Codex
   helper for chat, no stop for it on Tab's ring, the palette leaves `.ai` and the window closes.
@@ -440,14 +445,62 @@ The built-in `Quick AI` launcher command enters `AIScreen`, and carries a bindab
 third way in. Settings → AI holds the recorder and a checkbox for the command's place in launcher
 search, beside `AI Chat`'s; either shortcut keeps working while its command is hidden, and does
 nothing at all while the feature is off. The palette search field becomes the single-line composer.
-The footer pill and Return are one action, `activate`: Send, or Stop while a response streams — an
-empty composer sends nothing, so the pill never needs a disabled state. The header's trailing model
+The footer pill and Return are one action, `activate`: Choose in the skills dropdown, Send, or Stop
+while a response streams — an empty composer sends nothing. The header's trailing model
 switcher uses the same in-window menu control as Clipboard's type filter and changes the chat route
 for the next message. For installed routes and OpenRouter models whose catalog reports the
 capability, it also shows the supported reasoning efforts and changes the chat effort for the next
 message. Other API routes keep their provider default because their model catalogs expose no
 portable effort contract. Neither change interrupts a response already streaming; stopping one is
 the pill's job, so the header never has to fit a third control beside the switcher.
+
+#### Skills
+
+With AI enabled, type `/` at the start of the command palette field to open the skills list
+from any view. This enters Quick AI, keeps the draft, and leaves a blank search in the view
+underneath so Back does not reopen the list. Settings → AI → Chat → Show Skills on / controls
+this shortcut and is on by default; disabling it also suppresses partial `/ski` suggestions in
+Quick AI. The explicit `/skills` command remains available. Marked IME text does not open skills.
+Type part of a skill's name, identifier, or description after `/skills` to filter the list;
+arrows move the selection, and Return, Tab, or a
+click chooses it. Selection inserts `/skills <identifier> ` and leaves the caret at the end for
+an optional task. Send without extra text to run the skill's own workflow. Searches containing
+spaces stay in the dropdown unless their first token is a known skill identifier. Escape clears
+the composer using the palette's normal behavior. The dropdown uses
+`PopoverMenu` without a second search field, so the composer stays editable.
+
+“Edit skills.md” opens the shared source in the user's default editor. In Oz Dev it lives at
+`~/Library/Application Support/com.oz.app.dev/AI/skills.md`; stable uses `com.oz.app`.
+The source is created with Review changes and Explain code when missing, and existing contents
+are preserved. Each `## Name` heading defines a skill; the first paragraph describes its purpose,
+and the entire section is its instructions. Level-three headings and fenced code remain in the
+body. Names become unique lowercase identifiers with hyphens. The file is UTF-8, capped at 64 KB,
+64 skills, 80 characters per name, and 16 KB per skill body. Invalid files show an error in the
+dropdown and clear the loaded catalog; explicit unknown selections fail before
+calling the model.
+
+`AISkillCatalog` owns parsing and instruction composition; `AISkillCommand` owns slash parsing;
+`AISkillStore` owns off-main loading. The catalog refreshes on opening Quick AI, entering slash
+completion, and returning to Oz from an editor. An already loaded skill remains usable during
+refresh; a detected invalid edit still clears the catalog. Explicit selection injects the selected body for
+every Quick AI provider, including text-only models and requests with Files off. With Files on,
+ordinary Quick AI requests receive skill summaries and the source path so the model can read a
+matching section autonomously. This is guidance, not a separate permission policy. The slash
+invocation stays in saved user text, letting rerun and regenerate resolve the same skill from the
+loaded source. Follow-up messages without a slash invocation use automatic discovery. Quick
+Actions and the AI Chat window have no skills integration in this first phase.
+
+The reasoning control stays visible for a selected Codex model even when discovery has never
+succeeded and no effort is saved. Other routes retain it when an effort is saved or the catalog
+reports options. It states the saved effort, or Reasoning when the provider default applies.
+Codex retains its last known model metadata across failed or malformed catalog responses and
+unexpected helper exits; disconnected account state is still cleared. The effort menu offers Refresh Models when options are unavailable or stale.
+Disabling Codex or signing out clears the catalog. Reopening Quick AI prepares models again and
+retries a failed Codex connection. This keeps the existing effort choice separate from the
+availability of the process used to discover options. Both the MCP listing probe and app-server
+launch prepend the resolved Codex executable's directory and standard package-manager directories
+to PATH, so npm/nvm launchers can find their sibling Node runtime when Oz starts from Finder.
+The listing still fails closed if external MCP servers cannot be identified and disabled.
 
 The second footer control is the palette's normal Actions (`⌘K`) menu. It owns Continue in AI Chat
 (`⌘J`; Open AI Chat while the chat is empty), New Chat (`⌘N`), Chat History (`⌘Y`) and AI Settings

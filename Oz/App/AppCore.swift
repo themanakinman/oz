@@ -55,6 +55,8 @@ final class AppCore {
     let extensions: ExtensionManager
     let chatHistory: ChatHistoryStore
     let aiChats: AIChatSurfacesState
+    @ObservationIgnored private(set) lazy var aiSkills = AISkillStore(
+        file: AppPaths.applicationSupport().appendingPathComponent("AI/skills.md"))
     let aiSettings = AISettingsStore(
         isAppleIntelligenceAvailable: { AppleIntelligenceProvider.status().isAvailable })
     let mcpSettings = MCPSettingsStore()

@@ -76,7 +76,7 @@ struct AIChatDetailView: View {
                 ) {
                     state.toggleMenu(.models, selection: AIModelMenu.modelHighlight(coordinator: coordinator, chat: chat))
                 }
-                if !coordinator.reasoningEfforts(for: chat).isEmpty {
+                if coordinator.showsReasoningControl(for: chat) {
                     AIReasoningButton(
                         title: coordinator.selectedReasoningTitle(for: chat), isOpen: state.menu == .reasoning
                     ) {

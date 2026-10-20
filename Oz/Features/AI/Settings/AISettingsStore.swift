@@ -12,6 +12,9 @@ final class AISettingsStore {
     private(set) var defaultModel: AIModelSelection? {
         didSet { persistDefaultModel() }
     }
+    var skillsShortcutEnabled: Bool {
+        didSet { defaults.set(skillsShortcutEnabled, forKey: AppSettingsKey.aiSkillsShortcut.rawValue) }
+    }
     /// Off by default: a prompt reaches a search engine only once the user has said so.
     var webSearchEnabled: Bool {
         didSet { defaults.set(webSearchEnabled, forKey: AppSettingsKey.aiWebSearch.rawValue) }
@@ -69,6 +72,8 @@ final class AISettingsStore {
             defaults.data(forKey: AppSettingsKey.aiConnections.rawValue))
         defaultModel = Self.decodeDefaultModel(
             defaults.data(forKey: AppSettingsKey.aiDefaultModel.rawValue))
+        skillsShortcutEnabled =
+            defaults.object(forKey: AppSettingsKey.aiSkillsShortcut.rawValue) as? Bool ?? true
         webSearchEnabled =
             defaults.object(forKey: AppSettingsKey.aiWebSearch.rawValue) as? Bool ?? false
         systemPrompt = defaults.string(forKey: AppSettingsKey.aiSystemPrompt.rawValue) ?? ""

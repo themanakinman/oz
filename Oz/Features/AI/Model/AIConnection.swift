@@ -188,6 +188,10 @@ enum AIModelSelection: Codable, Equatable, Hashable, Sendable {
         }
     }
 
+    func showsReasoningControl(availableEfforts: [ChatGPTSubscription.Effort]) -> Bool {
+        source == .codex || effort != nil || !availableEfforts.isEmpty
+    }
+
     func withEffort(_ effort: String?) -> AIModelSelection {
         switch self {
         case .codex(let model, _): return .codex(model: model, effort: effort)

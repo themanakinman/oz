@@ -111,7 +111,7 @@ struct PopoverMenu: View {
     var width: CGFloat?
     let onActivate: (Int) -> Void
     var attachment = Attachment.none
-    let search: Search
+    let search: Search?
 
     @Environment(PaletteState.self) private var palette
     @Environment(\.metrics) private var metrics
@@ -129,12 +129,12 @@ struct PopoverMenu: View {
 
     private var surfaceContent: some View {
         VStack(spacing: 0) {
-            if search.placement == .top {
+            if search?.placement == .top {
                 searchField
                 searchSeparator
             }
             menuContent
-            if search.placement == .bottom {
+            if search?.placement == .bottom {
                 searchSeparator
                 searchField
             }
@@ -163,7 +163,7 @@ struct PopoverMenu: View {
 
     private var searchField: some View {
         @Bindable var palette = palette
-        let placeholder = search.placeholder
+        let placeholder = search?.placeholder ?? ""
         return TextField("", text: $palette.menuQuery)
             .textFieldStyle(.plain)
             .font(metrics.typography.menuRow)
@@ -183,7 +183,7 @@ struct PopoverMenu: View {
             }
             .padding(.horizontal, metrics.spacing.xl + metrics.spacing.sm)
             .frame(height: metrics.size.menuRowHeight)
-            .offset(y: search.placement == .bottom ? -metrics.spacing.xxs / 2 : 0)
+            .offset(y: search?.placement == .bottom ? -metrics.spacing.xxs / 2 : 0)
             .padding(.vertical, metrics.spacing.xxs / 2)
             .accessibilityLabel(placeholder)
             .onAppear { searchFocused = true }
@@ -361,6 +361,7 @@ private struct PopoverMenuRow: View {
                     .font(metrics.typography.menuRow)
                     .foregroundStyle(item.isDestructive ? Color.red : Color.primary)
                     .lineLimit(1)
+                    .layoutPriority(1)
                     .paletteResultText(isActive: selected || hovered)
                 Spacer(minLength: metrics.spacing.sm)
                 if let detail = item.detail {

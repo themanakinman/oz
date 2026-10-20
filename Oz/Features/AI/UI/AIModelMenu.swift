@@ -33,15 +33,32 @@ enum AIModelMenu {
 
     static func reasoning(coordinator: AIChatCoordinator, chat: AIChatState) -> PopoverMenuContent {
         let selected = coordinator.model(for: chat)?.effort
-        return PopoverMenuContent(
-            items: coordinator.reasoningEfforts(for: chat).map { effort in
-                PopoverMenuItem(
-                    title: effort.title, icon: .blank,
-                    detail: effort.id == selected ? "✓" : nil
-                ) {
-                    coordinator.selectReasoningEffort(effort, in: chat)
+        let efforts = coordinator.reasoningEfforts(for: chat)
+        guard !efforts.isEmpty else {
+            return PopoverMenuContent(items: [
+                PopoverMenuItem(title: "Reasoning options not loaded", systemImage: "info.circle", isEnabled: false) {},
+                PopoverMenuItem(title: "Refresh Models", systemImage: "arrow.clockwise") {
+                    coordinator.refreshReasoningOptions(for: chat)
                 }
+            ])
+        }
+        var items = efforts.map { effort in
+            PopoverMenuItem(
+                title: effort.title, icon: .blank,
+                detail: effort.id == selected ? "✓" : nil
+            ) {
+                coordinator.selectReasoningEffort(effort, in: chat)
+            }
+        }
+        if coordinator.reasoningOptionsNeedRefresh(for: chat) {
+            items.append(PopoverMenuItem(
+                title: "Using last available model options", systemImage: "info.circle", isEnabled: false,
+                startsSection: true) {})
+            items.append(PopoverMenuItem(title: "Refresh Models", systemImage: "arrow.clockwise") {
+                coordinator.refreshReasoningOptions(for: chat)
             })
+        }
+        return PopoverMenuContent(items: items)
     }
 
     /// One row per staged file, its ✕ beside the name: picking one takes that file back alone.

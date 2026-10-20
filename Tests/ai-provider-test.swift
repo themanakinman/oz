@@ -92,6 +92,7 @@ struct AIProviderTests {
         requestBodiesCarryDocuments()
         codexProtocolFramesRoundTrip()
         installedCLIStreamsDecode()
+        reasoningControlSurvivesMissingCatalog()
         settingsPersistAndRepairSelections()
         installedModelLoadingPreferencePersists()
         subscriptionSelectionsReconcile()
@@ -953,6 +954,13 @@ struct AIProviderTests {
             "an unavailable model does not silently reroute a stored on-device selection")
     }
 
+    static func reasoningControlSurvivesMissingCatalog() {
+        expect(AIModelSelection.codex(model: "gpt-6-luna", effort: nil).showsReasoningControl(availableEfforts: []),
+            "Codex keeps its effort control before any model catalog or saved effort exists")
+        expect(!AIModelSelection.appleIntelligence.showsReasoningControl(availableEfforts: []),
+            "on-device models do not acquire an unsupported reasoning control")
+    }
+
     static func settingsPersistAndRepairSelections() {
         let suite = "AIProviderTests.persistence"
         let defaults = isolatedDefaults(suite)
@@ -968,6 +976,8 @@ struct AIProviderTests {
             ])
         first.baseURL = " https://openrouter.ai/api/v1 "
         let store = AISettingsStore(defaults: defaults)
+        expect(store.skillsShortcutEnabled, "The palette skills shortcut is enabled by default")
+        store.skillsShortcutEnabled = false
         store.save(first)
         store.save(
             AIConnection(id: secondID, provider: .gemini, models: ["gemini-model"]))
@@ -981,6 +991,7 @@ struct AIProviderTests {
         store.select(.api(connection: firstID, model: "model-b", effort: "low"))
 
         let reopened = AISettingsStore(defaults: defaults)
+        expect(!reopened.skillsShortcutEnabled, "The skills shortcut toggle survives a restart")
         expect(reopened.connections == store.connections, "connection metadata survives a restart")
         expect(reopened.defaultModel == store.defaultModel, "the default model survives a restart")
         reopened.removeConnection(id: firstID)

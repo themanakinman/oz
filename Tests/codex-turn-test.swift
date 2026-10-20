@@ -17,6 +17,18 @@ struct CodexTurnTests {
     }
 
     static func main() async {
+        if CommandLine.arguments.contains("--catalog") {
+            await appEnvironmentFindsCodexRuntime()
+            await modelDiscoveryFailureKeepsReasoningOptions()
+            await skillInstructionsAndEffortReachCodex()
+            await aNodeInstallStartsWithFindersPath()
+            print("\(passes) passed, \(failures) failed")
+            if failures > 0 { exit(1) }
+            return
+        }
+        await appEnvironmentFindsCodexRuntime()
+        await modelDiscoveryFailureKeepsReasoningOptions()
+        await skillInstructionsAndEffortReachCodex()
         await aNodeInstallStartsWithFindersPath()
         await stopBeforeTurnStartedStillInterrupts()
         await aTurnNamedTwiceIsInterruptedOnce()
@@ -39,6 +51,89 @@ struct CodexTurnTests {
 
         print("\(passes) passed, \(failures) failed")
         if failures > 0 { exit(1) }
+    }
+
+    static func appEnvironmentFindsCodexRuntime() async {
+        let originalPath = ProcessInfo.processInfo.environment["PATH"] ?? ""
+        defer { setenv("PATH", originalPath, 1) }
+        guard let server = StubServer(mode: "model-catalog", appEnvironment: true) else {
+            expect(false, "the app environment fixture starts")
+            return
+        }
+        defer { server.tearDown() }
+        do {
+            try await server.client.start()
+            let response = try await server.client.request(method: "model/list")
+            expect(response["data"]?.arrayValue?.count == 1,
+                "Finder's PATH can start Codex and load reasoning metadata")
+            expect(server.listed == 1, "MCP isolation still reads the real listing before launch")
+        } catch {
+            expect(false, "Finder's PATH can start Codex: \(error.localizedDescription)")
+        }
+    }
+
+    static func modelDiscoveryFailureKeepsReasoningOptions() async {
+        guard let server = StubServer(mode: "model-catalog") else {
+            expect(false, "the model catalog fixture starts")
+            return
+        }
+        let manager = ChatGPTSubscriptionManager(supportDirectory: server.root)
+        defer {
+            manager.stop()
+            server.tearDown()
+        }
+        await manager.refresh().value
+        expect(manager.models.first?.efforts.map(\.id) == ["low", "high"],
+            "the selected model initially offers reasoning options")
+        server.mark("models-fail")
+        await manager.refresh().value
+        expect(manager.models.first?.efforts.map(\.id) == ["low", "high"],
+            "transient discovery failures keep the effort picker populated")
+        expect(manager.modelCatalogError != nil, "failed discovery is visible rather than silently ignored")
+        try? FileManager.default.removeItem(at: server.root.appending(path: "models-fail"))
+        server.mark("models-malformed")
+        await manager.refresh().value
+        expect(manager.models.first?.efforts.count == 2 && manager.modelCatalogError != nil,
+            "a malformed catalog keeps the known effort options and reports the error")
+        try? FileManager.default.removeItem(at: server.root.appending(path: "models-malformed"))
+        await manager.refresh().value
+        expect(manager.modelCatalogError == nil, "successful refresh clears discovery errors")
+        server.mark("helper-quit")
+        await manager.refresh().value
+        expect(manager.models.first?.efforts.count == 2,
+            "an unexpected helper exit keeps known reasoning options")
+        expect(!manager.isConnected, "retaining model metadata never retains account authority")
+        try? FileManager.default.removeItem(at: server.root.appending(path: "helper-quit"))
+        await manager.refresh().value
+        expect(manager.isConnected && manager.modelCatalogError == nil,
+            "the reasoning refresh reconnects after a helper exit")
+        manager.stop()
+        expect(manager.models.isEmpty, "disabling the provider still clears its catalog")
+    }
+
+    static func skillInstructionsAndEffortReachCodex() async {
+        guard let server = StubServer(mode: "hold-turn") else {
+            expect(false, "the skills provider fixture starts")
+            return
+        }
+        defer { server.tearDown() }
+        do {
+            let catalog = try AISkillCatalog(markdown: "## Explain code\nTrace the entry point: SKILL_PROVIDER_MARKER")
+            let instructions = try catalog.instructions(
+                for: "/skills explain-code", file: server.root.appending(path: "skills.md"), canReadFiles: false)
+            let request = AIRequest(
+                instructions: instructions, messages: [AIMessage(role: .user, text: "/skills explain-code")])
+            let stream = server.runner.stream(request, model: "gpt-6-luna", effort: "high")
+            let turn = Task { do { for try await _ in stream {} } catch {} }
+            defer { turn.cancel() }
+            let started = await server.awaitLog("turn-params:")
+            expect(started && server.received.contains("SKILL_PROVIDER_MARKER"),
+                "the selected skill body reaches the Codex thread instructions")
+            expect(server.received.contains(#""effort":"high""#),
+                "the chosen reasoning effort reaches the Codex turn")
+        } catch {
+            expect(false, "the selected skill request composes")
+        }
     }
 
     static func aNodeInstallStartsWithFindersPath() async {
@@ -592,7 +687,7 @@ final class StubServer {
     let client: CodexAppServerClient
     let runner: CodexTurnRunner
 
-    init?(mode: String) {
+    init?(mode: String, appEnvironment: Bool = false) {
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
             .appending(path: "codex-turn-\(UUID().uuidString)", directoryHint: .isDirectory)
         let executable = root.appending(path: "bin/codex")
@@ -603,8 +698,6 @@ final class StubServer {
                 at: URL(fileURLWithPath: "Tests/ai-fixtures/codex-stub.js"), to: executable)
             try FileManager.default.setAttributes(
                 [.posixPermissions: 0o755], ofItemAtPath: executable.path)
-            try "export PATH=\"\(executable.deletingLastPathComponent().path):$PATH\"\n".write(
-                to: root.appending(path: ".zprofile"), atomically: true, encoding: .utf8)
         } catch {
             print("the stub app-server could not be installed: \(error)")
             return nil
@@ -612,7 +705,20 @@ final class StubServer {
 
         // The locator walks PATH, so the stub only sits in front of any real `codex`.
         let inherited = ProcessInfo.processInfo.environment["PATH"] ?? ""
-        setenv("PATH", "\(executable.deletingLastPathComponent().path):\(inherited)", 1)
+        if appEnvironment {
+            let bin = executable.deletingLastPathComponent()
+            guard let node = inherited.split(separator: ":").map({
+                URL(fileURLWithPath: String($0)).appending(path: "node")
+            }).first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) else { return nil }
+            do {
+                try FileManager.default.createSymbolicLink(at: bin.appending(path: "node"), withDestinationURL: node)
+                try "export PATH=\(CodexMCPLaunch.quoted(bin.path)):/usr/bin:/bin:/usr/sbin:/sbin\n".write(
+                    to: root.appending(path: ".zshrc"), atomically: true, encoding: .utf8)
+            } catch { return nil }
+            setenv("PATH", "/usr/bin:/bin:/usr/sbin:/sbin", 1)
+        } else {
+            setenv("PATH", "\(executable.deletingLastPathComponent().path):\(inherited)", 1)
+        }
         // The locator asks a login shell first; the user's rc files would put a real `codex` ahead.
         setenv("ZDOTDIR", root.path, 1)
         setenv("TC_STUB_ROOT", root.path, 1)

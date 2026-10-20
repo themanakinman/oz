@@ -271,7 +271,8 @@ final class AIChatCoordinator {
             let sent = chat.send(
                 address.rest, using: try provider(for: chat, scopedTo: address.slug),
                 model: model(for: chat), webSearch: webSearch(for: chat),
-                instructions: instructions(for: chat, scopedTo: address.slug), contextBudget: contextBudget(for: chat),
+                instructions: try instructions(for: chat, scopedTo: address.slug, input: address.rest),
+                contextBudget: contextBudget(for: chat),
                 toolScope: address.slug)
             // Named while the answer streams, so the sidebar has a title before the reply ends.
             if sent { nameIfNeeded(chat) }
@@ -293,7 +294,8 @@ final class AIChatCoordinator {
             let sent = chat.send(
                 message.text, using: try provider(for: chat, scopedTo: message.toolScope),
                 model: model(for: chat), webSearch: webSearch(for: chat),
-                instructions: instructions(for: chat, scopedTo: message.toolScope), contextBudget: contextBudget(for: chat),
+                instructions: try instructions(for: chat, scopedTo: message.toolScope, input: message.text),
+                contextBudget: contextBudget(for: chat),
                 toolScope: message.toolScope, replaying: message)
             if sent { nameIfNeeded(chat) }
         } catch {
@@ -305,11 +307,13 @@ final class AIChatCoordinator {
     func regenerate(in chat: AIChatState) {
         guard settings.aiEnabled else { return }
         let scope = chat.session.messages.last { $0.role == .user }?.toolScope
+        let input = chat.session.messages.last { $0.role == .user }?.text ?? ""
         do {
             chat.regenerate(
                 using: try provider(for: chat, scopedTo: scope),
                 model: model(for: chat), webSearch: webSearch(for: chat),
-                instructions: instructions(for: chat, scopedTo: scope), contextBudget: contextBudget(for: chat))
+                instructions: try instructions(for: chat, scopedTo: scope, input: input),
+                contextBudget: contextBudget(for: chat))
         } catch {
             chat.report(error.localizedDescription)
         }
@@ -319,13 +323,17 @@ final class AIChatCoordinator {
         core.aiSettings.webSearchEnabled && capabilities(for: chat).webSearch
     }
 
-    private func instructions(for chat: AIChatState, scopedTo slug: String?) -> String? {
+    private func instructions(for chat: AIChatState, scopedTo slug: String?, input: String) throws -> String? {
         let prompt = AIInstructions.compose(
             userPrompt: core.aiSettings.systemPrompt,
             isEnabled: core.aiSettings.systemPromptEnabled)
-        guard filesEnabled(in: chat, scopedTo: slug) else { return prompt }
-        return [prompt, AIFileTools.instructions(home: fileRunner.home.path)]
-            .compactMap { $0 }.joined(separator: "\n\n")
+        let files = filesEnabled(in: chat, scopedTo: slug)
+        let skills = chat === chats.quickAI
+            ? try core.aiSkills.instructions(
+                for: input, canReadFiles: files, shortcutEnabled: core.aiSettings.skillsShortcutEnabled) : nil
+        let parts = [prompt, files ? AIFileTools.instructions(home: fileRunner.home.path) : nil, skills]
+            .compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: "\n\n")
     }
 
     private var fileRunner: AIFileToolRunner {
@@ -713,6 +721,10 @@ final class AIChatCoordinator {
 
     /// Fetches the list so the title is a name, and a default can resolve without Settings.
     func warmUpModelList() {
+        if core.aiSettings.enabledInstalledProviders.contains(.codex),
+            case .failed = core.chatGPTSubscription.phase {
+            core.chatGPTSubscription.refresh()
+        }
         guard let stored = core.aiSettings.defaultModel else {
             prepareModelSwitcher()
             core.aiSettings.resolveDefaultModel()
@@ -737,11 +749,28 @@ final class AIChatCoordinator {
             subscription: core.chatGPTSubscription, installedAI: core.installedAI)
     }
 
+    func showsReasoningControl(for chat: AIChatState) -> Bool {
+        model(for: chat)?.showsReasoningControl(availableEfforts: reasoningEfforts(for: chat)) == true
+    }
+
+    func reasoningOptionsNeedRefresh(for chat: AIChatState) -> Bool {
+        model(for: chat)?.source == .codex && core.chatGPTSubscription.modelCatalogError != nil
+    }
+
     func selectedReasoningTitle(for chat: AIChatState) -> String {
-        guard let selected = model(for: chat)?.effort,
-            let effort = reasoningEfforts(for: chat).first(where: { $0.id == selected })
-        else { return "Reasoning" }
-        return effort.title
+        guard let selected = model(for: chat)?.effort else { return "Reasoning" }
+        return ChatGPTSubscription.Effort(id: selected, detail: nil).title
+    }
+
+    func refreshReasoningOptions(for chat: AIChatState) {
+        switch model(for: chat)?.source {
+        case .codex:
+            if core.aiSettings.enabledInstalledProviders.contains(.codex) { core.chatGPTSubscription.refresh() }
+        case .claude, .grok, .openCode, .cursor, .antigravity:
+            if let kind = model(for: chat)?.source.installedKind { core.installedAI.refresh(kind: kind) }
+        case .api, .appleIntelligence, nil:
+            prepareModelSwitcher()
+        }
     }
 
     func selectReasoningEffort(_ effort: ChatGPTSubscription.Effort, in chat: AIChatState) {

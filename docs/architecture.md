@@ -118,6 +118,12 @@ MCP server. The helper receives home and channel-specific checkpoint paths, appl
 and has no UI or database. `AIChatCoordinator` composes the tools into the existing chat routes;
 there is no separate project or workspace owner.
 
+Oz skills have one lazy `AISkillStore` on `AppCore`, pointing at the channel's `AI/skills.md`.
+The store reads and seeds off-main; `AISkillCatalog` and `AISkillCommand` keep parsing and request
+instructions Foundation-only. `QuickAICoordinator` supplies the inline slash dropdown and
+`AIChatCoordinator` adds instructions to Quick AI requests across model routes. AI Chat window
+integration is deferred until the first palette interface is reviewed.
+
 `AICommandPolicy` checks direct command forms; the stateless `AICommandRunner` launches commands in
 their own process groups and captures bounded output off the main thread. Project code runs with the
 user's filesystem access, outside the structured file policy. `AIFileHelper` reads requests while

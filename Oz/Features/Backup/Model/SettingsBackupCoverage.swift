@@ -105,6 +105,8 @@ enum SettingsBackupCoverage {
             "AI connection metadata stays on the Mac with the Keychain credentials it describes.",
         AppSettingsKey.aiDefaultModel.rawValue:
             "The default model names an external AI destination; importing must not choose one.",
+        AppSettingsKey.aiSkillsShortcut.rawValue:
+            "The skills shortcut follows this Mac's AI setup, whose settings stay on this Mac.",
         AppSettingsKey.aiWebSearch.rawValue:
             "Whether prompts may reach a search engine is a choice each Mac makes for itself.",
         AppSettingsKey.aiSystemPrompt.rawValue:
